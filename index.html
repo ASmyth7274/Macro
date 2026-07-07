@@ -290,7 +290,9 @@ input.range{flex:1;accent-color:var(--acc);height:34px;margin:0}
 .food-row:active{background:var(--card2)}
 .src-tag{font-size:9.5px;font-weight:800;letter-spacing:.5px;padding:2px 6px;border-radius:6px;background:var(--card2);color:var(--dim);flex:0 0 auto}
 .src-tag.off{background:rgba(95,168,255,.13);color:var(--mp)}
+.src-tag.fdc{background:rgba(47,214,113,.13);color:var(--grn)}
 .src-tag.mine{background:var(--acc-dim);color:var(--acc)}
+input[type=checkbox]{accent-color:var(--acc);width:20px;height:20px}
 .skel{height:58px;position:relative;overflow:hidden;background:var(--card)}
 .skel + .skel{border-top:1px solid var(--line)}
 .skel::after{
@@ -380,6 +382,45 @@ input.range{flex:1;accent-color:var(--acc);height:34px;margin:0}
 .opt-card b{display:block;font-size:16.5px;font-weight:700;margin-bottom:3px}
 .opt-card span{font-size:13px;color:var(--dim);line-height:1.4}
 
+/* ---------- dashboard v2 ---------- */
+.weekstrip{display:flex;justify-content:space-between;gap:4px;margin:2px 2px 12px}
+.wd{flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;padding:7px 0 6px;border-radius:14px;background:var(--card);border:1px solid var(--line)}
+.wd span{font-size:9.5px;font-weight:700;color:var(--dim);text-transform:uppercase;letter-spacing:.5px}
+.wd i{font-style:normal;font-size:13px;line-height:16px;height:16px}
+.wd .dot2{width:7px;height:7px;border-radius:4px;background:var(--dim);opacity:.5;margin:4.5px 0}
+.wd.today{border-color:var(--acc)}
+.wd.star{background:var(--acc-dim)}
+.qrow{display:flex;gap:8px;overflow-x:auto;padding:2px 2px 8px;margin:0 -2px;-webkit-overflow-scrolling:touch;scrollbar-width:none}
+.qrow::-webkit-scrollbar{display:none}
+.qchip{
+  flex:0 0 auto;max-width:190px;display:flex;align-items:center;gap:8px;
+  background:var(--card);border:1px solid var(--line);border-radius:15px;padding:9px 13px;
+}
+.qchip:active{background:var(--acc-dim)}
+.qchip>div{display:flex;flex-direction:column;align-items:flex-start;min-width:0}
+.qchip b{font-size:13.5px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:150px}
+.qchip span{font-size:11px;color:var(--dim);white-space:nowrap}
+.qchip .qi{font-size:15px}
+.insight{display:flex;gap:10px;align-items:flex-start;padding:8px 2px}
+.insight+.insight{border-top:1px solid var(--line)}
+.insight .ii{font-size:16px;line-height:1.3;flex:0 0 22px;text-align:center}
+.insight p{font-size:13.5px;line-height:1.45}
+.insight p b{font-weight:800}
+/* micronutrient bars */
+.microrow{display:flex;align-items:center;gap:9px;padding:5px 0}
+.microrow .ml{flex:0 0 84px;font-size:12px;font-weight:700;color:var(--dim)}
+.microrow .mbar{flex:1;height:7px;border-radius:4px;background:var(--card2);overflow:hidden}
+.microrow .mfill{height:100%;border-radius:4px;background:var(--acc);transition:width .6s cubic-bezier(.25,.8,.3,1)}
+.microrow .mfill.warn{background:var(--red)}
+.microrow .mv{flex:0 0 86px;text-align:right;font-size:11.5px;font-weight:700}
+.microrow .mv small{color:var(--dim);font-weight:600}
+/* nutrition grade badges (Nutri-Score palette) */
+.gr{display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto;
+  width:22px;height:22px;border-radius:7px;font-size:12px;font-weight:800;color:#fff;text-transform:uppercase}
+.gr.est{opacity:.75}
+.gr-a{background:#038141}.gr-b{background:#85BB2F}.gr-c{background:#F5B62E;color:#4a3a00}
+.gr-d{background:#EF7E1A}.gr-e{background:#E63E11}
+.gr.big{width:44px;height:44px;border-radius:14px;font-size:22px}
 /* ---------- misc states ---------- */
 .empty{text-align:center;padding:34px 20px;color:var(--dim)}
 .empty .serif{font-size:19px;font-style:italic;color:var(--text);margin-bottom:6px}
@@ -446,15 +487,27 @@ input.range{flex:1;accent-color:var(--acc);height:34px;margin:0}
                          prof:{age,sex,cm,kg,act}, onboard, seedVer}
    Export/import = JSON snapshot of all stores (order-insensitive verify).
    ================================================================== */
-const APP_VER='1.0';   // shown in Settings — check which build a device runs
+const APP_VER='2.0';   // shown in Settings — check which build a device runs
 const DB_NAME='macrolog';
 const MEALS=[['b','Breakfast'],['l','Lunch'],['d','Dinner'],['s','Snacks']];
 const MEAL_NAME=Object.fromEntries(MEALS);
-const ZERO={kcal:0,p:0,c:0,f:0,fib:0,sug:0,sod:0};
+/* nutrient vector: macros + satf (sat fat g) + micros (all mg).
+   Every food stores the full vector; unknown values stay 0. */
+const ZERO={kcal:0,p:0,c:0,f:0,satf:0,fib:0,sug:0,sod:0,iron:0,k:0,ca:0,vitc:0,caff:0};
+/* micro reference intakes [key,label,unit,RDA male,RDA female,isLimit]
+   (NIH DRIs; caffeine 400 mg is the FDA guideline CEILING, not a goal) */
+const MICROS=[
+  ['iron','Iron','mg',8,18,false],
+  ['k','Potassium','mg',3400,2600,false],
+  ['ca','Calcium','mg',1000,1000,false],
+  ['vitc','Vitamin C','mg',90,75,false],
+  ['caff','Caffeine','mg',400,400,true],
+];
+const microRDA=(key)=>{const m=MICROS.find(x=>x[0]===key);return S.set.prof.sex==='f'?m[4]:m[3];};
 const DEF={name:'',theme:'dark',accent:'bronze',
   t:{kcal:2200,p:150,c:230,f:70},
   prof:{age:25,sex:'m',cm:178,kg:75,act:1.55},
-  onboard:0,seedVer:1};
+  fdcKey:'',onboard:0,seedVer:1};
 /* accent palettes: [dark accent, dark accent-light, light-mode accent] */
 const ACCENTS={
   bronze:['#C9A96D','#E8CFA0','#A9884D'],
@@ -477,34 +530,36 @@ const SF=(id,name,p100,servLabel,servG,extra)=>({
   id,src:'seed',name,brand:'',per:null,servLabel,servG,
   p100:{...ZERO,...p100},thumb:null,ts:0,used:0,lastUsed:0,hidden:0,edited:0,...extra});
 const SEED_FOODS=[
-SF('s01','Chicken Breast (cooked)',{kcal:165,p:31,c:0,f:3.6},'100 g',100),
-SF('s02','Egg (whole)',{kcal:143,p:12.6,c:0.7,f:9.5},'1 large egg (50g)',50),
-SF('s03','White Rice (cooked)',{kcal:130,p:2.7,c:28.2,f:0.3,fib:0.4},'1 small bowl (150g)',150),
-SF('s04','Brown Rice (cooked)',{kcal:112,p:2.3,c:23.5,f:0.8,fib:1.8},'1 small bowl (150g)',150),
-SF('s05','Oats (dry)',{kcal:379,p:13.2,c:67.7,f:6.5,fib:10.1,sug:1},'1 serving (40g)',40),
-SF('s06','Whole Milk',{kcal:61,p:3.2,c:4.8,f:3.3,sug:4.8},'1 glass (250ml)',250),
-SF('s07','Semi-Skimmed Milk',{kcal:47,p:3.4,c:4.8,f:1.7,sug:4.8},'1 glass (250ml)',250),
-SF('s08','Greek Yogurt (whole)',{kcal:97,p:9,c:3.9,f:5,sug:3.9},'1 pot (170g)',170),
-SF('s09','Banana',{kcal:89,p:1.1,c:22.8,f:0.3,fib:2.6,sug:12.2},'1 medium (118g)',118),
-SF('s10','Apple',{kcal:52,p:0.3,c:13.8,f:0.2,fib:2.4,sug:10.4},'1 medium (182g)',182),
-SF('s11','Potato (boiled)',{kcal:87,p:1.9,c:20.1,f:0.1,fib:1.8},'1 medium (173g)',173),
-SF('s12','Sweet Potato (baked)',{kcal:90,p:2,c:20.7,f:0.2,fib:3.3,sug:6.5},'1 medium (150g)',150),
-SF('s13','Salmon (cooked)',{kcal:208,p:20.4,c:0,f:13.4},'1 fillet (125g)',125),
-SF('s14','Beef Mince 5% (cooked)',{kcal:164,p:27,c:0,f:6},'1 serving (125g)',125),
-SF('s15','Whey Protein',{kcal:393,p:78,c:6,f:6.5},'1 scoop (30g)',30),
-SF('s16','Peanut Butter',{kcal:588,p:25,c:20,f:50,fib:6,sug:9},'1 tbsp (16g)',16),
-SF('s17','White Bread',{kcal:265,p:9,c:49,f:3.2,fib:2.7,sug:5,sod:490},'1 slice (38g)',38),
-SF('s18','Wholemeal Bread',{kcal:247,p:13,c:41,f:3.4,fib:7,sug:4.3,sod:450},'1 slice (38g)',38),
-SF('s19','Pasta (cooked)',{kcal:158,p:5.8,c:30.9,f:0.9,fib:1.8},'1 serving (180g)',180),
-SF('s20','Olive Oil',{kcal:884,p:0,c:0,f:100},'1 tbsp (14g)',14),
-SF('s21','Butter',{kcal:717,p:0.9,c:0.1,f:81,sod:576},'1 tsp (5g)',5),
-SF('s22','Cheddar Cheese',{kcal:403,p:24.9,c:1.3,f:33.1,sod:621},'1 slice (30g)',30),
-SF('s23','Tuna (canned in water)',{kcal:116,p:25.5,c:0,f:0.8,sod:338},'1 can (112g)',112),
-SF('s24','Broccoli',{kcal:34,p:2.8,c:6.6,f:0.4,fib:2.6,sug:1.7},'1 serving (90g)',90),
-SF('s25','Avocado',{kcal:160,p:2,c:8.5,f:14.7,fib:6.7},'1/2 avocado (68g)',68),
-SF('s26','Almonds',{kcal:579,p:21.2,c:21.6,f:49.9,fib:12.5,sug:4.4},'1 handful (28g)',28),
-SF('s27','Honey',{kcal:304,p:0.3,c:82.4,f:0,sug:82.1},'1 tbsp (21g)',21),
-SF('s28','Tortilla Wrap',{kcal:310,p:8.5,c:50,f:8,fib:3,sod:640},'1 wrap (64g)',64),
+SF('s01','Chicken Breast (cooked)',{kcal:165,p:31,c:0,f:3.6,satf:1,iron:1,k:256,ca:15},'100 g',100),
+SF('s02','Egg (whole)',{kcal:143,p:12.6,c:0.7,f:9.5,satf:3.1,iron:1.8,k:138,ca:56},'1 large egg (50g)',50),
+SF('s03','White Rice (cooked)',{kcal:130,p:2.7,c:28.2,f:0.3,satf:.1,fib:0.4,iron:1.2,k:35,ca:10},'1 small bowl (150g)',150),
+SF('s04','Brown Rice (cooked)',{kcal:112,p:2.3,c:23.5,f:0.8,satf:.2,fib:1.8,iron:.5,k:86,ca:10},'1 small bowl (150g)',150),
+SF('s05','Oats (dry)',{kcal:379,p:13.2,c:67.7,f:6.5,satf:1.1,fib:10.1,sug:1,iron:4.7,k:429,ca:54},'1 serving (40g)',40),
+SF('s06','Whole Milk',{kcal:61,p:3.2,c:4.8,f:3.3,satf:1.9,sug:4.8,k:132,ca:113},'1 glass (250ml)',250),
+SF('s07','Semi-Skimmed Milk',{kcal:47,p:3.4,c:4.8,f:1.7,satf:1.1,sug:4.8,k:150,ca:120},'1 glass (250ml)',250),
+SF('s08','Greek Yogurt (whole)',{kcal:97,p:9,c:3.9,f:5,satf:2.4,sug:3.9,k:141,ca:100},'1 pot (170g)',170),
+SF('s09','Banana',{kcal:89,p:1.1,c:22.8,f:0.3,satf:.1,fib:2.6,sug:12.2,iron:.3,k:358,ca:5,vitc:8.7},'1 medium (118g)',118),
+SF('s10','Apple',{kcal:52,p:0.3,c:13.8,f:0.2,fib:2.4,sug:10.4,iron:.1,k:107,ca:6,vitc:4.6},'1 medium (182g)',182),
+SF('s11','Potato (boiled)',{kcal:87,p:1.9,c:20.1,f:0.1,fib:1.8,iron:.3,k:328,ca:8,vitc:7.4},'1 medium (173g)',173),
+SF('s12','Sweet Potato (baked)',{kcal:90,p:2,c:20.7,f:0.2,fib:3.3,sug:6.5,iron:.7,k:475,ca:38,vitc:20},'1 medium (150g)',150),
+SF('s13','Salmon (cooked)',{kcal:208,p:20.4,c:0,f:13.4,satf:3.1,iron:.3,k:384,ca:15},'1 fillet (125g)',125),
+SF('s14','Beef Mince 5% (cooked)',{kcal:164,p:27,c:0,f:6,satf:2.5,iron:2.7,k:350,ca:12},'1 serving (125g)',125),
+SF('s15','Whey Protein',{kcal:393,p:78,c:6,f:6.5,satf:1.5,iron:1,k:500,ca:400},'1 scoop (30g)',30),
+SF('s16','Peanut Butter',{kcal:588,p:25,c:20,f:50,satf:10,fib:6,sug:9,iron:1.7,k:560,ca:49},'1 tbsp (16g)',16),
+SF('s17','White Bread',{kcal:265,p:9,c:49,f:3.2,satf:.7,fib:2.7,sug:5,sod:490,iron:3.6,k:126,ca:144},'1 slice (38g)',38),
+SF('s18','Wholemeal Bread',{kcal:247,p:13,c:41,f:3.4,satf:.6,fib:7,sug:4.3,sod:450,iron:2.5,k:250,ca:106},'1 slice (38g)',38),
+SF('s19','Pasta (cooked)',{kcal:158,p:5.8,c:30.9,f:0.9,satf:.2,fib:1.8,iron:.5,k:44,ca:7},'1 serving (180g)',180),
+SF('s20','Olive Oil',{kcal:884,p:0,c:0,f:100,satf:14},'1 tbsp (14g)',14),
+SF('s21','Butter',{kcal:717,p:0.9,c:0.1,f:81,satf:51,sod:576,k:24,ca:24},'1 tsp (5g)',5),
+SF('s22','Cheddar Cheese',{kcal:403,p:24.9,c:1.3,f:33.1,satf:21,sod:621,iron:.1,k:98,ca:710},'1 slice (30g)',30),
+SF('s23','Tuna (canned in water)',{kcal:116,p:25.5,c:0,f:0.8,satf:.2,sod:338,iron:1,k:237,ca:11},'1 can (112g)',112),
+SF('s24','Broccoli',{kcal:34,p:2.8,c:6.6,f:0.4,satf:.1,fib:2.6,sug:1.7,iron:.7,k:316,ca:47,vitc:89},'1 serving (90g)',90),
+SF('s25','Avocado',{kcal:160,p:2,c:8.5,f:14.7,satf:2.1,fib:6.7,iron:.6,k:485,ca:12,vitc:10},'1/2 avocado (68g)',68),
+SF('s26','Almonds',{kcal:579,p:21.2,c:21.6,f:49.9,satf:3.8,fib:12.5,sug:4.4,iron:3.7,k:733,ca:269},'1 handful (28g)',28),
+SF('s27','Honey',{kcal:304,p:0.3,c:82.4,f:0,sug:82.1,k:52},'1 tbsp (21g)',21),
+SF('s28','Tortilla Wrap',{kcal:310,p:8.5,c:50,f:8,satf:3.5,fib:3,sod:640,iron:3,k:130,ca:150},'1 wrap (64g)',64),
+SF('s29','Black Coffee (brewed)',{kcal:1,p:.1,c:0,f:0,k:49,caff:40},'1 mug (240ml)',240),
+SF('s30','Green Tea (brewed)',{kcal:1,p:0,c:0,f:0,caff:12},'1 mug (240ml)',240),
 ];
 // derive per-serving macros for records that carry p100 + servG
 function derivePer(f){
@@ -587,14 +642,16 @@ const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 const esc=s=>String(s).replace(/[&<>"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]));
 function haptic(){try{HAPTIC_SW.click();}catch(e){}}
 
-/* macro math */
+/* nutrient math — generic over the ZERO vector so new nutrients ride along */
 function scaleMac(m,k){
-  return {kcal:(m.kcal||0)*k,p:(m.p||0)*k,c:(m.c||0)*k,f:(m.f||0)*k,
-    fib:(m.fib||0)*k,sug:(m.sug||0)*k,sod:(m.sod||0)*k};
+  const o={};
+  for(const key of Object.keys(ZERO))o[key]=(m[key]||0)*k;
+  return o;
 }
 function addMac(a,b){
-  return {kcal:a.kcal+ (b.kcal||0),p:a.p+(b.p||0),c:a.c+(b.c||0),f:a.f+(b.f||0),
-    fib:a.fib+(b.fib||0),sug:a.sug+(b.sug||0),sod:a.sod+(b.sod||0)};
+  const o={};
+  for(const key of Object.keys(ZERO))o[key]=(a[key]||0)+(b[key]||0);
+  return o;
 }
 // macros of one diary entry (grams-based if the food has per-100g data)
 function entryMacros(en){
@@ -855,7 +912,10 @@ function weekAvg(){
   return n?{avg:sum/n,n}:null;
 }
 
-/* ---------------- Today tab ---------------- */
+/* ---------------- Dashboard tab ----------------
+   Rings + week strip + one-tap quick log + insights + micros + food
+   quality. Meal-by-meal editing lives in Diary — the dashboard is for
+   reading the day at a glance and firing the common actions. */
 function renderToday(){
   const pg=$('#pg-today');pg.innerHTML='';
   const cv=h('canvas',{id:'fx'});
@@ -873,9 +933,215 @@ function renderToday(){
   RG.remain=remain;
   const hero=h('div',{class:'card hero'},cv,
     h('div',{class:'hero-in'},ringwrap,stats),remain);
-  pg.append(hero,mealGroupsEl(todayStr()));
+  pg.append(hero,weekStripEl());
+  pg.append(h('div',{class:'addsec'},h('h4',{},'Quick log'),
+    h('button',{style:'font-size:13px;font-weight:700;color:var(--acc)',
+      onclick:()=>switchTab('add')},'See all →')));
+  pg.append(quickRowEl());
+  pg.append(insightsCard(),microCardEl(),qualityCardEl());
   ringsUpdate();
   requestAnimationFrame(()=>fxEnsure(cv));   // canvas needs layout first
+}
+
+/* star day = every target closely met (kcal ±10%, protein ≥90%,
+   carbs & fat ±20%) — the "closely met" definition behind ⭐ everywhere */
+function starDay(ds){
+  if(!entriesFor(ds).length)return false;
+  const t=dayTotals(ds),g=S.set.t;
+  const within=(v,tv,tol)=>tv>0&&Math.abs(v-tv)<=tv*tol;
+  return within(t.kcal,g.kcal,.1)&&t.p>=g.p*.9&&within(t.c,g.c,.2)&&within(t.f,g.f,.2);
+}
+function lastNDays(n,off){
+  const out=[];
+  for(let i=0;i<n;i++)out.push(addDays(todayStr(),-(i+(off||0))));
+  return out;
+}
+function avgOver(days,key){
+  let s=0,n=0;
+  for(const d of days)if(entriesFor(d).length){s+=dayTotals(d)[key];n++;}
+  return n?{avg:s/n,n}:null;
+}
+
+function weekStripEl(){
+  const strip=h('div',{class:'weekstrip'});
+  for(let i=6;i>=0;i--){
+    const ds=addDays(todayStr(),-i);
+    const star=starDay(ds),logged=entriesFor(ds).length>0;
+    const wd=new Date(ds+'T12:00').toLocaleDateString(undefined,{weekday:'narrow'});
+    const mark=star?h('i',{},'⭐'):logged?h('span',{class:'dot2'}):h('i',{style:'opacity:.18'},'·');
+    strip.append(h('button',{class:'wd'+(i===0?' today':'')+(star?' star':''),
+      onclick:()=>{S.date=ds;switchTab('diary');}},
+      h('span',{},wd),mark));
+  }
+  return strip;
+}
+
+function quickRowEl(){
+  const row=h('div',{class:'qrow'});
+  row.append(h('button',{class:'qchip',onclick:()=>copyDaySheet(todayStr())},
+    h('span',{class:'qi'},'⧉'),
+    h('div',{},h('b',{},'Copy yesterday'),h('span',{},'whole day or one meal'))));
+  const mls=[...S.meals].sort((a,b)=>(b.used||0)-(a.used||0)).slice(0,4);
+  for(const m of mls){
+    const t=mealMacros(m);
+    row.append(h('button',{class:'qchip',onclick:()=>logMealSheet(m)},
+      h('span',{class:'qi'},'☰'),
+      h('div',{},h('b',{},m.name),h('span',{class:'num'},kc(t.kcal)+' kcal · '+m.items.length+' items'))));
+  }
+  const freq=[...S.foods.values()].filter(f=>!f.hidden&&(f.used||0)>=2)
+    .sort((a,b)=>b.used-a.used).slice(0,6);
+  for(const f of freq){
+    row.append(h('button',{class:'qchip',onclick:()=>openLogSheet(f)},
+      h('div',{},h('b',{},f.name),h('span',{class:'num'},kc((f.per||ZERO).kcal)+' kcal · logged '+f.used+'×'))));
+  }
+  if(row.children.length===1)
+    row.append(h('div',{class:'qchip',style:'border-style:dashed'},
+      h('div',{},h('b',{class:'dim'},'Your meals & regulars land here'),
+      h('span',{},'log a few foods first'))));
+  return row;
+}
+
+/* rule-based trend insights — plain sentences, max 4, most useful first */
+function insightLines(){
+  const out=[],t=S.set.t;
+  const wk0=avgOver(lastNDays(7),'kcal'),wk1=avgOver(lastNDays(7,7),'kcal');
+  let stars=0;
+  for(const d of lastNDays(7))if(starDay(d))stars++;
+  if(stars)out.push(['⭐','<b>'+stars+' star day'+(stars===1?'':'s')+'</b> this week — targets closely met.']);
+  if(wk0&&wk1&&wk0.n>=3&&wk1.n>=3){
+    const d=Math.round(wk0.avg-wk1.avg);
+    out.push(Math.abs(d)>=100
+      ?['⚖️','You’ve eaten <b>'+Math.abs(d)+' '+(d>0?'more':'fewer')+' kcal/day</b> than last week.']
+      :['⚖️','Steady week — within <b>100 kcal/day</b> of last week.']);
+  }
+  const pr=avgOver(lastNDays(7),'p');
+  if(pr&&pr.n>=3){
+    if(pr.avg>=t.p)out.push(['💪','Protein on point — averaging <b>'+g1(pr.avg)+' g/day</b> (target '+g1(t.p)+' g).']);
+    else if(pr.avg<t.p*.75)out.push(['💪','Protein is lagging — <b>'+g1(pr.avg)+' g/day</b> vs your '+g1(t.p)+' g target.']);
+  }
+  // weakest micro of the week (skip caffeine — it's a ceiling)
+  const TIPS={iron:'red meat, lentils and spinach help',k:'bananas, potatoes and dairy help',
+    ca:'dairy, almonds and greens help',vitc:'citrus, peppers and broccoli help'};
+  let worst=null;
+  for(const[key,label,unit]of MICROS){
+    if(key==='caff')continue;
+    const a=avgOver(lastNDays(7),key);
+    if(!a||a.n<3)continue;
+    const ratio=a.avg/microRDA(key);
+    if(ratio<.6&&(!worst||ratio<worst.ratio))worst={key,label,unit,avg:a.avg,ratio};
+  }
+  if(worst)out.push(['🥦','Try to increase your <b>'+worst.label.toLowerCase()+
+    '</b> intake — averaging '+g1(worst.avg)+' '+worst.unit+' of the '+
+    g1(microRDA(worst.key))+' '+worst.unit+' guideline; '+TIPS[worst.key]+'.']);
+  const cf=avgOver(lastNDays(7),'caff');
+  if(cf&&cf.avg>400)out.push(['☕','Caffeine is averaging <b>'+kc(cf.avg)+' mg/day</b> — above the 400 mg guideline.']);
+  const q0=qualityAvg(lastNDays(7)),q1=qualityAvg(lastNDays(7,7));
+  if(q0!=null){
+    let txt='Food quality this week averages <b>'+gradeLetter(q0)+'</b>';
+    if(q1!=null&&Math.abs(q0-q1)>=.25)txt+=q0>q1?' — up from '+gradeLetter(q1)+'.':' — down from '+gradeLetter(q1)+'.';
+    else txt+='.';
+    out.push(['🥗',txt]);
+  }
+  return out.slice(0,4);
+}
+function insightsCard(){
+  const card=h('div',{class:'card'},h('h3',{class:'serif'},'Insights'));
+  const lines=insightLines();
+  if(!lines.length){
+    card.append(h('p',{class:'small dim'},'Log a few days and your trends appear here.'));
+    return card;
+  }
+  for(const[icon,html]of lines)
+    card.append(h('div',{class:'insight'},h('span',{class:'ii'},icon),h('p',{html})));
+  return card;
+}
+
+function microCardEl(){
+  const t=dayTotals(todayStr());
+  const card=h('div',{class:'card'},h('h3',{class:'serif'},'Micronutrients today'));
+  for(const[key,label,unit,,,isLimit]of MICROS){
+    const target=microRDA(key),v=t[key]||0;
+    const pct=target>0?clamp(v/target,0,1):0;
+    const over=isLimit&&v>target;
+    const fill=h('div',{class:'mfill'+(over?' warn':''),style:'width:'+Math.round(pct*100)+'%'});
+    card.append(h('div',{class:'microrow'},
+      h('span',{class:'ml'},label),
+      h('div',{class:'mbar'},fill),
+      h('span',{class:'mv num'+(over?' streakfire':'')},
+        g1(v)+' ',h('small',{},(isLimit?'limit ':'/ ')+g1(target)+unit))));
+  }
+  card.append(h('p',{class:'tiny dim',style:'margin-top:8px'},
+    'From logged foods only — many products don’t declare micronutrients, so treat these as a floor, not an exact count.'));
+  return card;
+}
+
+function qualityCardEl(){
+  const card=h('div',{class:'card'},h('h3',{class:'serif'},'Food quality'));
+  const q=qualityAvg([todayStr()]);
+  if(q==null){
+    card.append(h('p',{class:'small dim'},'Log something today and its Nutri-Score average shows here — A (whole foods) to E (ultra-processed).'));
+    return card;
+  }
+  const letter=gradeLetter(q);
+  const wk=qualityAvg(lastNDays(7));
+  card.append(h('div',{class:'row'},
+    h('span',{class:'gr big gr-'+letter.toLowerCase()},letter),
+    h('div',{class:'grow'},
+      h('p',{class:'small'},'Today’s kcal-weighted Nutri-Score.'),
+      h('p',{class:'tiny dim'},wk!=null?'7-day average: '+gradeLetter(wk):'Official grades from Open Food Facts; others estimated.'))));
+  return card;
+}
+
+/* ---------------- copy a previous day's entries ---------------- */
+function copyDaySheet(target){
+  let src=addDays(target,-1);
+  const picks=Object.fromEntries(MEALS.map(([mk])=>[mk,true]));
+  const list=h('div',{class:'listcard mt8'});
+  const copyBtn=h('button',{class:'btn primary mt12'});
+  const srcIn=h('input',{type:'date',class:'in',value:src,onchange:e=>{
+    if(e.target.value){src=e.target.value;redraw();}
+  }});
+  function redraw(){
+    list.innerHTML='';
+    let any=0;
+    for(const[mk,label]of MEALS){
+      const ens=entriesFor(src).filter(e=>e.meal===mk);
+      if(!ens.length)continue;
+      any+=ens.length;
+      let sum={...ZERO};
+      for(const e of ens)sum=addMac(sum,entryMacros(e));
+      const cb=h('input',{type:'checkbox',onchange:e=>{picks[mk]=e.target.checked;count();}});
+      cb.checked=picks[mk];
+      const mid=h('div',{class:'grow'},
+        h('div',{class:'fr-name'},label),
+        h('div',{class:'fr-sub num'},ens.length+' item'+(ens.length===1?'':'s')+' · '+kc(sum.kcal)+' kcal'));
+      list.append(h('label',{class:'food-row',style:'cursor:pointer'},cb,mid));
+    }
+    if(!any)list.append(h('div',{class:'mealempty'},h('i',{},'Nothing logged on '+fmtDay(src))));
+    count();
+  }
+  function count(){
+    let n=0;
+    for(const[mk]of MEALS)if(picks[mk])n+=entriesFor(src).filter(e=>e.meal===mk).length;
+    copyBtn.textContent=n?'Copy '+n+' item'+(n===1?'':'s')+' to '+(target===todayStr()?'today':fmtDay(target)):'Nothing selected';
+    copyBtn.disabled=!n;
+    copyBtn.style.opacity=n?'':'0.5';
+  }
+  copyBtn.addEventListener('click',async()=>{
+    let n=0;
+    for(const[mk]of MEALS){
+      if(!picks[mk])continue;
+      for(const en of entriesFor(src).filter(e=>e.meal===mk)){
+        await logEntry({date:target,meal:mk,foodId:en.foodId,amt:en.amt,unit:en.unit});
+        n++;
+      }
+    }
+    haptic();close();renderTab(S.tab);
+    toast('Copied '+n+' item'+(n===1?'':'s')+' ✓',{pr:true});
+  });
+  const close=sheet('Copy a day',h('div',{},
+    labeled('Copy from',srcIn),list,copyBtn));
+  redraw();
 }
 
 /* shared meal-group list (Today + Diary use the same renderer, so any edit
@@ -980,7 +1246,7 @@ function editEntrySheet(en){
    classic cgi/search.pl JSON endpoint (v2 has no free-text parameter).
    EVERY product that comes back is cached into the foods store keyed
    'off:<barcode>', so repeat scans/searches work fully offline. */
-const OFF_FIELDS='code,product_name,brands,nutriments,serving_size,serving_quantity,image_small_url';
+const OFF_FIELDS='code,product_name,brands,nutriments,serving_size,serving_quantity,image_small_url,nutriscore_grade,nova_group';
 function netSet(off){S.offline=off;document.body.classList.toggle('off',off);}
 async function offFetch(url){
   const ac=new AbortController();
@@ -1010,11 +1276,14 @@ function offToFood(prod){
   const n=prod.nutriments||{};
   let kcal=n['energy-kcal_100g'];
   if(kcal==null&&n['energy_100g']!=null)kcal=n['energy_100g']/4.184;  // kJ fallback
+  const mg=v=>Math.round((+v||0)*100000)/100;   // OFF stores minerals in g → mg
   let p100=null;
   if(kcal!=null||n.proteins_100g!=null||n.carbohydrates_100g!=null){
-    p100={kcal:+kcal||0,p:+n.proteins_100g||0,c:+n.carbohydrates_100g||0,
-      f:+n.fat_100g||0,fib:+n.fiber_100g||0,sug:+n.sugars_100g||0,
-      sod:Math.round((+n.sodium_100g||0)*1000)};
+    p100={...ZERO,kcal:+kcal||0,p:+n.proteins_100g||0,c:+n.carbohydrates_100g||0,
+      f:+n.fat_100g||0,satf:+n['saturated-fat_100g']||0,
+      fib:+n.fiber_100g||0,sug:+n.sugars_100g||0,
+      sod:mg(n.sodium_100g),iron:mg(n.iron_100g),k:mg(n.potassium_100g),
+      ca:mg(n.calcium_100g),vitc:mg(n['vitamin-c_100g']),caff:mg(n.caffeine_100g)};
   }
   let servG=parseFloat(prod.serving_quantity)||parseGramsFromLabel(prod.serving_size);
   let servLabel=(prod.serving_size||'').trim();
@@ -1022,20 +1291,115 @@ function offToFood(prod){
   if(!p100){
     // per-serving-only products (some OFF entries lack per-100g data)
     if(n['energy-kcal_serving']==null)return null;
-    per={kcal:+n['energy-kcal_serving']||0,p:+n.proteins_serving||0,
+    per={...ZERO,kcal:+n['energy-kcal_serving']||0,p:+n.proteins_serving||0,
       c:+n.carbohydrates_serving||0,f:+n.fat_serving||0,
+      satf:+n['saturated-fat_serving']||0,
       fib:+n.fiber_serving||0,sug:+n.sugars_serving||0,
-      sod:Math.round((+n.sodium_serving||0)*1000)};
+      sod:mg(n.sodium_serving),iron:mg(n.iron_serving),k:mg(n.potassium_serving),
+      ca:mg(n.calcium_serving),vitc:mg(n['vitamin-c_serving']),caff:mg(n.caffeine_serving)};
     if(servG)p100=scaleMac(per,100/servG);
     if(!servLabel)servLabel='1 serving';
   }
   if(p100&&!servG){servG=100;servLabel=servLabel||'100 g';}
   if(p100&&!servLabel)servLabel=servG+' g';
+  const ns=/^[a-e]$/.test(prod.nutriscore_grade||'')?prod.nutriscore_grade:null;
   const f={id:'off:'+prod.code,src:'off',barcode:String(prod.code),name,
     brand:(prod.brands||'').split(',')[0].trim(),per,servLabel,servG:servG||null,
-    p100,thumb:prod.image_small_url||null,
+    p100,thumb:prod.image_small_url||null,ns,nova:+prod.nova_group||null,
     ts:Date.now(),used:0,lastUsed:0,hidden:0,edited:0};
   return derivePer(f);
+}
+
+/* ---------- nutrition quality scoring ----------
+   Official Nutri-Score grades ride in free on OFF products (ns field).
+   For everything else (custom, seeds, USDA) we estimate one with the
+   2017 Nutri-Score points algorithm — minus the fruit/veg% component,
+   which packaging data doesn't give us — and mark it "est". */
+const ptsOf=(v,steps)=>{let n=0;for(const s of steps)if(v>s)n++;return n;};
+function estimateNS(p100){
+  if(!p100||(!p100.kcal&&!p100.p&&!p100.c&&!p100.f))return null;
+  const kj=p100.kcal*4.184;
+  const N=ptsOf(kj,[335,670,1005,1340,1675,2010,2345,2680,3015,3350])
+    +ptsOf(p100.sug||0,[4.5,9,13.5,18,22.5,27,31,36,40,45])
+    +ptsOf(p100.satf||0,[1,2,3,4,5,6,7,8,9,10])
+    +ptsOf(p100.sod||0,[90,180,270,360,450,540,630,720,810,900]);
+  const fibP=ptsOf(p100.fib||0,[.7,1.4,2.8,3.7,4.7]);
+  const proP=ptsOf(p100.p||0,[1.6,3.2,4.8,6.4,8]);
+  const score=N-(N>=11?fibP:fibP+proP);   // protein capped at high N (official rule)
+  return score<=-1?'a':score<=2?'b':score<=10?'c':score<=18?'d':'e';
+}
+function foodGrade(f){
+  if(f.ns)return {g:f.ns,est:false};
+  const g=estimateNS(f.p100);
+  return g?{g,est:true}:null;
+}
+function gradeBadge(f,big){
+  const gr=foodGrade(f);
+  if(!gr)return null;
+  return h('span',{class:'gr gr-'+gr.g+(gr.est?' est':'')+(big?' big':''),
+    title:(gr.est?'Estimated ':'')+'Nutri-Score '+gr.g.toUpperCase()},gr.g);
+}
+const GRADE_VAL={a:5,b:4,c:3,d:2,e:1};
+const gradeLetter=v=>v>=4.5?'A':v>=3.5?'B':v>=2.5?'C':v>=1.5?'D':'E';
+// kcal-weighted average food grade across a set of days (1..5, null = no data)
+function qualityAvg(days){
+  let ws=0,w=0;
+  for(const ds of days)for(const en of entriesFor(ds)){
+    const f=S.foods.get(en.foodId);
+    if(!f)continue;
+    const gr=foodGrade(f);
+    if(!gr)continue;
+    const wt=Math.max(entryMacros(en).kcal,1);
+    ws+=GRADE_VAL[gr.g]*wt;w+=wt;
+  }
+  return w?ws/w:null;
+}
+
+/* ---------- USDA FoodData Central (backup search API) ----------
+   Free, CORS-enabled, works with DEMO_KEY out of the box (rate-limited;
+   Settings accepts a personal key from fdc.nal.usda.gov to lift it).
+   Search responses report nutrients per 100 g. */
+const FDC_NUTR={1008:'kcal',1003:'p',1005:'c',1004:'f',1258:'satf',1079:'fib',
+  2000:'sug',1093:'sod',1089:'iron',1092:'k',1087:'ca',1162:'vitc',1057:'caff'};
+const capWords=s=>{
+  s=String(s).trim();
+  if(s===s.toUpperCase())s=s.toLowerCase().replace(/(^|[\s(,/])([a-z])/g,(m,a,b)=>a+b.toUpperCase());
+  return s;
+};
+function fdcToFood(x){
+  if(!x||!x.fdcId||!x.description)return null;
+  const p100={...ZERO};
+  for(const nu of x.foodNutrients||[]){
+    const key=FDC_NUTR[nu.nutrientId];
+    if(key)p100[key]=+nu.value||0;
+  }
+  if(!p100.kcal&&!p100.p&&!p100.c&&!p100.f)return null;
+  const servG=(x.servingSizeUnit&&/^(g|ml|grm|mlt)$/i.test(x.servingSizeUnit))?(+x.servingSize||null):null;
+  const f={id:'fdc:'+x.fdcId,src:'fdc',barcode:x.gtinUpc||null,name:capWords(x.description),
+    brand:capWords(x.brandName||x.brandOwner||''),per:null,
+    servLabel:servG?servG+' g':'100 g',servG:servG||100,p100,thumb:null,
+    ns:null,nova:null,ts:Date.now(),used:0,lastUsed:0,hidden:0,edited:0};
+  return derivePer(f);
+}
+async function fdcSearch(q){
+  const key=(S.set.fdcKey||'').trim()||'DEMO_KEY';
+  const r=await offFetch('https://api.nal.usda.gov/fdc/v1/foods/search?api_key='+
+    encodeURIComponent(key)+'&query='+encodeURIComponent(q)+
+    '&pageSize=24&dataType=Foundation,SR%20Legacy,Branded');
+  if(!r.ok)throw new Error('USDA '+r.status);
+  const j=await r.json();
+  const out=[];
+  for(const x of j.foods||[]){
+    const f=fdcToFood(x);
+    if(f)out.push(await cacheOffFood(f));
+  }
+  return out;
+}
+/* full search chain: OFF (search.pl → Search-a-licious) → USDA — the app
+   picks whichever answers, on the fly */
+async function netSearch(q){
+  try{return {src:'off',results:await offSearch(q)};}catch(e){}
+  return {src:'fdc',results:await fdcSearch(q)};
 }
 // cache an OFF record without clobbering anything the user touched
 async function cacheOffFood(f){
@@ -1112,6 +1476,8 @@ function foodRowBtn(f,tag,onclick){
     h('div',{class:'fr-name'},f.name),
     h('div',{class:'fr-sub'},sub));
   const row=h('button',{class:'food-row',onclick},frThumb(f),mid);
+  const gb=gradeBadge(f);
+  if(gb)row.append(gb);
   if(tag)row.append(h('span',{class:'src-tag '+tag[1]},tag[0]));
   row.append(kcalEl);
   return row;
@@ -1179,28 +1545,51 @@ async function doSearch(q){
     box.append(addSec('Your library'),card);
   }
   const offBox=h('div',{class:'listcard'},h('div',{class:'skel'}),h('div',{class:'skel'}),h('div',{class:'skel'}));
-  box.append(addSec('Open Food Facts'),offBox);
-  let results=[],failed=false;
-  try{results=await offSearch(q);}catch(e){failed=true;}
+  const srcHead=addSec('Searching…');
+  box.append(srcHead,offBox);
+  let res=null,failed=false;
+  try{res=await netSearch(q);}catch(e){failed=true;}
   if(seq!==S.searchSeq)return;   // a newer search superseded this one
   offBox.innerHTML='';
   if(failed){
+    srcHead.querySelector('h4').textContent='Online search';
     offBox.append(h('div',{class:'searchmsg'},
-      h('div',{class:'serif'},'Can’t reach Open Food Facts'),
-      h('p',{},(S.offline?'You’re offline':'Their search may be down right now')+
+      h('div',{class:'serif'},'No food database answered'),
+      h('p',{},(S.offline?'You’re offline':'Open Food Facts and USDA are both unreachable right now')+
         ' — your library, cached scans, barcode lookups and custom foods still work.')));
     return;
   }
+  srcHead.querySelector('h4').textContent=res.src==='off'?'Open Food Facts':'USDA FoodData Central';
   const seen=new Set(local.map(f=>f.id));
+  const tagOf=f=>f.src==='fdc'?['USDA','fdc']:['OFF','off'];
   let shown=0;
-  for(const f of results){
+  for(const f of res.results){
     if(seen.has(f.id))continue;
-    offBox.append(foodRowBtn(S.foods.get(f.id)||f,['OFF','off'],()=>openLogSheet(S.foods.get(f.id)||f)));
+    offBox.append(foodRowBtn(S.foods.get(f.id)||f,tagOf(f),()=>openLogSheet(S.foods.get(f.id)||f)));
     shown++;
   }
   if(!shown)offBox.append(h('div',{class:'searchmsg'},
     h('div',{class:'serif'},'No matches'),
     h('p',{},'Try a simpler name, scan the barcode, or create it as a custom food.')));
+  // thin OFF results? offer the backup database explicitly
+  if(res.src==='off'&&shown<5){
+    const alt=h('button',{class:'btn sm mt8',onclick:async()=>{
+      alt.textContent='Searching USDA…';
+      let extra=[];
+      try{extra=await fdcSearch(q);}catch(e){}
+      if(seq!==S.searchSeq)return;
+      alt.remove();
+      let n=0;
+      for(const f of extra){
+        if(seen.has(f.id))continue;
+        seen.add(f.id);
+        offBox.append(foodRowBtn(S.foods.get(f.id)||f,['USDA','fdc'],()=>openLogSheet(S.foods.get(f.id)||f)));
+        n++;
+      }
+      if(!n)offBox.append(h('div',{class:'searchmsg'},h('p',{},'USDA had nothing extra for “'+q+'”.')));
+    }},'No luck? Try the USDA database →');
+    box.append(alt);
+  }
 }
 
 /* ---------- log sheet (new entry AND edit-entry both live here) ---------- */
@@ -1225,7 +1614,11 @@ function openLogSheet(food,ctx,existing){
   const unitLbl=h('div',{class:'tiny dim',style:'text-align:center;margin-top:4px'});
   function unitNote(){unitLbl.textContent=unit==='g'?'grams':(food.servLabel||'servings');}
   const body=h('div',{});
-  if(food.brand||food.servLabel)body.append(h('p',{class:'small dim',style:'margin:0 2px 8px'},(food.brand?food.brand+' · ':'')+(food.servLabel||'')));
+  const subRow=h('div',{class:'row',style:'margin:0 2px 8px'});
+  const gb=gradeBadge(food);
+  if(gb)subRow.append(gb);
+  if(food.brand||food.servLabel)subRow.append(h('p',{class:'small dim grow'},(food.brand?food.brand+' · ':'')+(food.servLabel||'')));
+  if(subRow.children.length)body.append(subRow);
   body.append(preview);
   if(food.p100&&food.servG){
     body.append(labeled('Amount in',seg([['serv','Servings'],['g','Grams']],unit,v=>{
@@ -1286,10 +1679,16 @@ function customFoodSheet(existing,prefill,onSaved){
   const kI=in_(f.per.kcal||'','kcal',true),pI=in_(f.per.p||'','g',true),
         cI=in_(f.per.c||'','g',true),fI=in_(f.per.f||'','g',true);
   const fibI=in_(f.per.fib||'','g',true),sugI=in_(f.per.sug||'','g',true),
-        sodI=in_(f.per.sod||'','mg',true);
+        sodI=in_(f.per.sod||'','mg',true),satfI=in_(f.per.satf||'','g',true),
+        ironI=in_(f.per.iron||'','mg',true),kI2=in_(f.per.k||'','mg',true),
+        caI=in_(f.per.ca||'','mg',true),vitcI=in_(f.per.vitc||'','mg',true),
+        caffI=in_(f.per.caff||'','mg',true);
   const more=h('div',{style:'display:none'},
-    h('div',{class:'grid2'},labeled('Fibre (g)',fibI),labeled('Sugar (g)',sugI)),
-    labeled('Sodium (mg)',sodI));
+    h('div',{class:'grid2'},labeled('Sat. fat (g)',satfI),labeled('Fibre (g)',fibI)),
+    h('div',{class:'grid2 mt8'},labeled('Sugar (g)',sugI),labeled('Sodium (mg)',sodI)),
+    h('div',{class:'grid2 mt8'},labeled('Iron (mg)',ironI),labeled('Potassium (mg)',kI2)),
+    h('div',{class:'grid2 mt8'},labeled('Calcium (mg)',caI),labeled('Vitamin C (mg)',vitcI)),
+    labeled('Caffeine (mg)',caffI));
   const moreBtn=h('button',{class:'btn sm mt8',onclick:()=>{
     more.style.display=more.style.display==='none'?'block':'none';
   }},'More nutrients…');
@@ -1299,9 +1698,11 @@ function customFoodSheet(existing,prefill,onSaved){
     f.name=name;f.brand=brandI.value.trim();
     f.servLabel=servI.value.trim()||'1 serving';
     f.servG=numOr(servGI.value,0)||null;
-    f.per={kcal:numOr(kI.value,0),p:numOr(pI.value,0),c:numOr(cI.value,0),
-      f:numOr(fI.value,0),fib:numOr(fibI.value,0),sug:numOr(sugI.value,0),
-      sod:numOr(sodI.value,0)};
+    f.per={...ZERO,kcal:numOr(kI.value,0),p:numOr(pI.value,0),c:numOr(cI.value,0),
+      f:numOr(fI.value,0),satf:numOr(satfI.value,0),fib:numOr(fibI.value,0),
+      sug:numOr(sugI.value,0),sod:numOr(sodI.value,0),iron:numOr(ironI.value,0),
+      k:numOr(kI2.value,0),ca:numOr(caI.value,0),vitc:numOr(vitcI.value,0),
+      caff:numOr(caffI.value,0)};
     // per-100g basis derived when the serving weight is known
     f.p100=f.servG?scaleMac(f.per,100/f.servG):null;
     if(existing)f.edited=1;
@@ -1562,7 +1963,7 @@ function renderDiary(){
   }});
   const bar=h('div',{class:'datebar'},
     h('button',{class:'dchev',onclick:()=>{S.date=addDays(ds,-1);renderDiary();}},'‹'),
-    h('div',{class:'dlabel'},isToday?'Today':fmtDay(ds),dinp),
+    h('div',{class:'dlabel'},(starDay(ds)?'⭐ ':'')+(isToday?'Today':fmtDay(ds)),dinp),
     h('button',{class:'dchev',onclick:()=>{S.date=addDays(ds,1);renderDiary();}},'›'));
   if(!isToday)bar.append(h('button',{class:'dtoday',onclick:()=>{S.date=todayStr();renderDiary();}},'Today'));
   pg.append(bar);
@@ -1581,6 +1982,8 @@ function renderDiary(){
     tile(t.p,tg.p,'protein','g'),
     tile(t.c,tg.c,'carbs','g'),
     tile(t.f,tg.f,'fat','g')));
+  pg.append(h('button',{class:'btn sm mb8',onclick:()=>copyDaySheet(ds)},
+    '⧉ Copy another day’s entries here'));
   pg.append(mealGroupsEl(ds));
 }
 
@@ -1762,7 +2165,7 @@ const NAV_ICONS={
   progress:'<svg viewBox="0 0 24 24"><path d="M4 19.5h16"/><path d="M6.5 15.5l3.5-4.5 3 2.5 4.5-6.5"/></svg>',
   settings:'<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.2"/><path d="M12 3.5v2.4M12 18.1v2.4M3.5 12h2.4M18.1 12h2.4M6 6l1.7 1.7M16.3 16.3L18 18M18 6l-1.7 1.7M7.7 16.3L6 18"/></svg>',
 };
-const TABS=[['today','Today'],['diary','Diary'],['add','Add'],['progress','Progress'],['settings','Settings']];
+const TABS=[['today','Dashboard'],['diary','Diary'],['add','Add'],['progress','Progress'],['settings','Settings']];
 function buildNav(){
   const nav=$('#nav');nav.innerHTML='';
   for(const[id,label]of TABS){
@@ -1911,7 +2314,12 @@ function renderSettings(){
       S.entries.length+' diary entries · '+S.foods.size+' foods · '+S.meals.length+' meals · '+S.body.length+' weigh-ins'),
     h('button',{class:'btn sm',onclick:downloadExport},'Export backup (JSON)'),
     h('button',{class:'btn sm mt8',onclick:importSheet},'Import backup…'),
-    h('button',{class:'btn danger sm mt8',onclick:wipeAll},'Erase everything')));
+    h('button',{class:'btn danger sm mt8',onclick:wipeAll},'Erase everything'),
+    labeled('USDA API key (optional)',h('input',{class:'in',value:S.set.fdcKey||'',
+      placeholder:'blank = shared DEMO_KEY (rate-limited)',autocomplete:'off',
+      onchange:e=>{S.set.fdcKey=e.target.value.trim();saveSet();toast('USDA key saved');}})),
+    h('p',{class:'tiny dim',style:'margin-top:6px'},
+      'The backup food search uses USDA FoodData Central when Open Food Facts is unreachable. A free personal key from fdc.nal.usda.gov/api-key-signup lifts the shared rate limit.')));
   // about
   pg.append(h('div',{class:'card'},h('h3',{class:'serif'},'About'),
     h('div',{class:'setrow'},h('span',{class:'grow dim small'},'Version'),h('b',{class:'num'},APP_VER)),
@@ -1934,7 +2342,7 @@ function downloadExport(){
   toast('Backup downloaded');
 }
 const FOOD_DEF={src:'custom',barcode:null,brand:'',per:null,servLabel:'1 serving',
-  servG:null,p100:null,thumb:null,ts:0,used:0,lastUsed:0,hidden:0,edited:0};
+  servG:null,p100:null,thumb:null,ns:null,nova:null,ts:0,used:0,lastUsed:0,hidden:0,edited:0};
 async function applyImport(data){
   if(!data||data.app!=='macrolog'||!Array.isArray(data.entries))
     throw new Error('Not a MacroLog backup file');
@@ -2057,13 +2465,23 @@ async function loadAll(){
   const inc=set||{};
   S.set={...DEF,...inc,t:{...DEF.t,...(inc.t||{})},prof:{...DEF.prof,...(inc.prof||{})}};
   reindex();
-  // seed backfill: hidden/edited seed records persist as tombstones, so a
-  // simple presence check can never resurrect a deleted staple
+  // seed backfill + refresh: hidden/edited seed records persist as
+  // tombstones (presence check can never resurrect a deleted staple), and
+  // code OWNS the nutrition of unedited seeds — so model upgrades (e.g. the
+  // v2 micronutrient fields) propagate into stored copies on next boot.
   for(const sf of SEED_FOODS){
-    if(!S.foods.has(sf.id)){
+    const ex=S.foods.get(sf.id);
+    if(!ex){
       const c={...sf,ts:Date.now()};
       S.foods.set(c.id,c);
       await dbPut('foods',c);
+    }else if(!ex.edited){
+      const upd={...ex,name:sf.name,per:sf.per,p100:sf.p100,
+        servLabel:sf.servLabel,servG:sf.servG};
+      if(JSON.stringify(upd)!==JSON.stringify(ex)){
+        S.foods.set(sf.id,upd);
+        await dbPut('foods',upd);
+      }
     }
   }
 }
