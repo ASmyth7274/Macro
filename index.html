@@ -254,7 +254,10 @@ input.range{flex:1;accent-color:var(--acc);height:34px;margin:0}
 .fr-thumb img{width:100%;height:100%;object-fit:cover}
 .fr-name{font-size:15px;font-weight:600;line-height:1.25;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .fr-sub{font-size:12px;color:var(--dim);margin-top:1px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.fr-kcal{text-align:right;flex:0 0 auto}
+.fr-kcal{text-align:right;flex:0 0 54px}  /* fixed width → grade badges align */
+.note-line{font-size:12.5px;color:var(--acc);background:var(--acc-dim);padding:8px 12px;line-height:1.4}
+.mealcard .note-line{border-bottom:1px solid var(--line)}
+.daynote{display:block;width:100%;text-align:left;border-radius:14px;margin-bottom:10px}
 .fr-kcal b{font-size:15px;font-weight:800}
 .fr-kcal span{display:block;font-size:10.5px;color:var(--dim)}
 .mealempty{padding:13px 14px;font-size:13.5px;color:var(--dim)}
@@ -487,27 +490,60 @@ input[type=checkbox]{accent-color:var(--acc);width:20px;height:20px}
                          prof:{age,sex,cm,kg,act}, onboard, seedVer}
    Export/import = JSON snapshot of all stores (order-insensitive verify).
    ================================================================== */
-const APP_VER='2.0';   // shown in Settings — check which build a device runs
+const APP_VER='2.1';   // shown in Settings — check which build a device runs
 const DB_NAME='macrolog';
-const MEALS=[['b','Breakfast'],['l','Lunch'],['d','Dinner'],['s','Snacks']];
-const MEAL_NAME=Object.fromEntries(MEALS);
-/* nutrient vector: macros + satf (sat fat g) + micros (all mg).
-   Every food stores the full vector; unknown values stay 0. */
-const ZERO={kcal:0,p:0,c:0,f:0,satf:0,fib:0,sug:0,sod:0,iron:0,k:0,ca:0,vitc:0,caff:0};
-/* micro reference intakes [key,label,unit,RDA male,RDA female,isLimit]
-   (NIH DRIs; caffeine 400 mg is the FDA guideline CEILING, not a goal) */
+/* meal slots are user-configurable (rename the core four, add up to two
+   extras) — entries store the slot id, so renames apply retroactively */
+const MEALS_DEF=[['b','Breakfast'],['l','Lunch'],['d','Dinner'],['s','Snacks']];
+let MEALS=MEALS_DEF.map(x=>[...x]);
+let MEAL_NAME=Object.fromEntries(MEALS);
+function applyMeals(){
+  MEALS=(S.set.meals&&S.set.meals.length?S.set.meals:MEALS_DEF).map(x=>[...x]);
+  MEAL_NAME=Object.fromEntries(MEALS);
+}
+/* nutrient vector: macros + satf (g) + minerals/vitamins.
+   UNITS: satf/fib/sug g · sod/iron/k/ca/mag/zn/vitc/vite/caff mg ·
+   vita/vitd/b12/fol µg. Unknown values stay 0. */
+const ZERO={kcal:0,p:0,c:0,f:0,satf:0,fib:0,sug:0,sod:0,
+  iron:0,k:0,ca:0,mag:0,zn:0,vita:0,vitc:0,vitd:0,vite:0,b12:0,fol:0,caff:0};
+/* micro reference intakes [key,label,unit,RDA male,RDA female,isLimit,group]
+   (NIH DRIs; sodium 2300 mg and caffeine 400 mg are CEILINGS, not goals) */
 const MICROS=[
-  ['iron','Iron','mg',8,18,false],
-  ['k','Potassium','mg',3400,2600,false],
-  ['ca','Calcium','mg',1000,1000,false],
-  ['vitc','Vitamin C','mg',90,75,false],
-  ['caff','Caffeine','mg',400,400,true],
+  ['iron','Iron','mg',8,18,false,'Minerals'],
+  ['k','Potassium','mg',3400,2600,false,'Minerals'],
+  ['ca','Calcium','mg',1000,1000,false,'Minerals'],
+  ['mag','Magnesium','mg',400,310,false,'Minerals'],
+  ['zn','Zinc','mg',11,8,false,'Minerals'],
+  ['sod','Sodium','mg',2300,2300,true,'Minerals'],
+  ['vita','Vitamin A','µg',900,700,false,'Vitamins'],
+  ['vitc','Vitamin C','mg',90,75,false,'Vitamins'],
+  ['vitd','Vitamin D','µg',15,15,false,'Vitamins'],
+  ['vite','Vitamin E','mg',15,15,false,'Vitamins'],
+  ['b12','Vitamin B12','µg',2.4,2.4,false,'Vitamins'],
+  ['fol','Folate','µg',400,400,false,'Vitamins'],
+  ['caff','Caffeine','mg',400,400,true,'Other'],
 ];
-const microRDA=(key)=>{const m=MICROS.find(x=>x[0]===key);return S.set.prof.sex==='f'?m[4]:m[3];};
+// custom per-micro targets (Settings) override the sex-based defaults
+const microRDA=(key)=>{
+  const ov=(S.set.microT||{})[key];
+  if(ov>0)return ov;
+  const m=MICROS.find(x=>x[0]===key);
+  return S.set.prof.sex==='f'?m[4]:m[3];
+};
 const DEF={name:'',theme:'dark',accent:'bronze',
   t:{kcal:2200,p:150,c:230,f:70},
+  t2:null,t2days:[],          // optional training-day targets + weekdays (0=Sun)
   prof:{age:25,sex:'m',cm:178,kg:75,act:1.55},
+  meals:null,microT:{},autoLog:[],autoDate:'',netCarbs:0,
   fdcKey:'',onboard:0,seedVer:1};
+/* per-day targets: training-day override when the weekday is picked */
+function targetFor(ds){
+  const w=new Date(ds+'T12:00').getDay();
+  return (S.set.t2&&(S.set.t2days||[]).includes(w))?S.set.t2:S.set.t;
+}
+/* net-carb display mode: shown carbs = carbs − fibre (data stays raw) */
+const dispC=m=>S.set.netCarbs?Math.max((m.c||0)-(m.fib||0),0):(m.c||0);
+const carbLbl=()=>S.set.netCarbs?'Net carbs':'Carbs';
 /* accent palettes: [dark accent, dark accent-light, light-mode accent] */
 const ACCENTS={
   bronze:['#C9A96D','#E8CFA0','#A9884D'],
@@ -561,11 +597,40 @@ SF('s28','Tortilla Wrap',{kcal:310,p:8.5,c:50,f:8,satf:3.5,fib:3,sod:640,iron:3,
 SF('s29','Black Coffee (brewed)',{kcal:1,p:.1,c:0,f:0,k:49,caff:40},'1 mug (240ml)',240),
 SF('s30','Green Tea (brewed)',{kcal:1,p:0,c:0,f:0,caff:12},'1 mug (240ml)',240),
 ];
+// notable vitamin/mineral values for staples (per 100 g; vita/vitd/b12/fol
+// in µg) — patched onto the seed definitions above to keep those lines sane
+const SEED_MICRO={
+  s01:{mag:29,zn:1,b12:.3,fol:4},
+  s02:{mag:12,zn:1.3,vita:160,vitd:2,vite:1,b12:.9,fol:47},
+  s05:{mag:177,zn:4,fol:56,vite:.7},
+  s06:{mag:11,zn:.4,vita:46,vitd:1.3,b12:.45,fol:5},
+  s07:{mag:11,zn:.4,vita:23,vitd:1,b12:.5,fol:6},
+  s08:{mag:11,zn:.5,vita:63,b12:.75,fol:12},
+  s09:{mag:27,fol:20},
+  s11:{mag:20,fol:10},
+  s12:{mag:27,vita:960,fol:6},
+  s13:{mag:29,zn:.6,vitd:13,b12:2.8,fol:29,vite:1.1},
+  s14:{mag:21,zn:6.3,b12:2.6,fol:9},
+  s15:{mag:60,zn:2,ca:400,b12:1.5},
+  s16:{mag:154,zn:2.5,vite:9,fol:87},
+  s17:{mag:23,zn:.9,fol:85},
+  s18:{mag:75,zn:1.8,fol:42},
+  s22:{mag:28,zn:3.6,vita:330,b12:1.1,fol:27},
+  s23:{mag:33,zn:.7,vitd:1.7,b12:2.5,fol:5},
+  s24:{mag:21,zn:.4,vita:77,fol:63,vite:.8},
+  s25:{mag:29,zn:.6,fol:81,vite:2.1},
+  s26:{mag:270,zn:3.1,vite:25.6,fol:44},
+  s28:{mag:20,zn:.8,fol:60},
+};
 // derive per-serving macros for records that carry p100 + servG
 function derivePer(f){
   if(f.p100&&f.servG)f.per=scaleMac(f.p100,f.servG/100);
   else if(!f.per)f.per={...ZERO};
   return f;
+}
+for(const[id,mi]of Object.entries(SEED_MICRO)){
+  const f=SEED_FOODS.find(x=>x.id===id);
+  if(f)Object.assign(f.p100,mi);
 }
 SEED_FOODS.forEach(derivePer);
 
@@ -604,6 +669,7 @@ const S={
   meals:[],           // saved recipes
   body:[],            // body-weight log
   set:{...DEF},
+  notes:{},           // date -> {day:'…', b:'…', …} (kv 'notes')
   byDate:new Map(),   // derived: date -> [entries] (rebuilt by reindex())
   addCtx:null,        // {date, meal} target when adding from Diary/meal +
   offline:!navigator.onLine,
@@ -814,8 +880,8 @@ function rstatRow(key,label,color){
     h('div',{class:'grow'},h('div',{class:'rl'},label),val));
 }
 function ringsUpdate(){
-  const t=dayTotals(todayStr()),tg=S.set.t;
-  const spec=[['k',t.kcal,tg.kcal,'',kc],['p',t.p,tg.p,'g',g1],['c',t.c,tg.c,'g',g1],['f',t.f,tg.f,'g',g1]];
+  const t=dayTotals(todayStr()),tg=targetFor(todayStr());
+  const spec=[['k',t.kcal,tg.kcal,'',kc],['p',t.p,tg.p,'g',g1],['c',dispC(t),tg.c,'g',g1],['f',t.f,tg.f,'g',g1]];
   for(const[key,v,target,unit,fmt]of spec){
     const pct=target>0?v/target:0;
     RG[key].arc.style.strokeDashoffset=String(100-clamp(pct,0,1)*100);
@@ -825,7 +891,7 @@ function ringsUpdate(){
     }
   }
   if(RG.mid)RG.mid.textContent=kc(t.kcal);
-  const left=S.set.t.kcal-t.kcal;
+  const left=tg.kcal-t.kcal;
   if(RG.remain){
     RG.remain.classList.toggle('over',left<0);
     RG.remain.innerHTML=left>=0
@@ -888,7 +954,7 @@ document.addEventListener('visibilitychange',()=>{if(!document.hidden)fxStart();
    ±10% of target — a forgiving-but-honest adherence definition. */
 function adherent(ds){
   if(!entriesFor(ds).length)return false;
-  const t=dayTotals(ds).kcal,tg=S.set.t.kcal;
+  const t=dayTotals(ds).kcal,tg=targetFor(ds).kcal;
   return tg>0&&Math.abs(t-tg)<=tg*.1;
 }
 function streaks(){
@@ -927,7 +993,7 @@ function renderToday(){
   const stats=h('div',{class:'ringstats'},
     rstatRow('k','Calories','var(--acc)'),
     rstatRow('p','Protein','var(--mp)'),
-    rstatRow('c','Carbs','var(--mc)'),
+    rstatRow('c',carbLbl(),'var(--mc)'),
     rstatRow('f','Fat','var(--mf)'));
   const remain=h('div',{class:'remain num'});
   RG.remain=remain;
@@ -947,9 +1013,9 @@ function renderToday(){
    carbs & fat ±20%) — the "closely met" definition behind ⭐ everywhere */
 function starDay(ds){
   if(!entriesFor(ds).length)return false;
-  const t=dayTotals(ds),g=S.set.t;
+  const t=dayTotals(ds),g=targetFor(ds);
   const within=(v,tv,tol)=>tv>0&&Math.abs(v-tv)<=tv*tol;
-  return within(t.kcal,g.kcal,.1)&&t.p>=g.p*.9&&within(t.c,g.c,.2)&&within(t.f,g.f,.2);
+  return within(t.kcal,g.kcal,.1)&&t.p>=g.p*.9&&within(dispC(t),g.c,.2)&&within(t.f,g.f,.2);
 }
 function lastNDays(n,off){
   const out=[];
@@ -1019,12 +1085,16 @@ function insightLines(){
     if(pr.avg>=t.p)out.push(['💪','Protein on point — averaging <b>'+g1(pr.avg)+' g/day</b> (target '+g1(t.p)+' g).']);
     else if(pr.avg<t.p*.75)out.push(['💪','Protein is lagging — <b>'+g1(pr.avg)+' g/day</b> vs your '+g1(t.p)+' g target.']);
   }
-  // weakest micro of the week (skip caffeine — it's a ceiling)
+  // weakest nutrient of the week across ALL tracked micros (limits excluded)
   const TIPS={iron:'red meat, lentils and spinach help',k:'bananas, potatoes and dairy help',
-    ca:'dairy, almonds and greens help',vitc:'citrus, peppers and broccoli help'};
+    ca:'dairy, almonds and greens help',vitc:'citrus, peppers and broccoli help',
+    mag:'nuts, seeds and whole grains help',zn:'meat, shellfish and pumpkin seeds help',
+    vita:'carrots, sweet potato and eggs help',vitd:'oily fish and egg yolks help (and sunshine)',
+    vite:'almonds, seeds and olive oil help',b12:'meat, fish and dairy help — or a supplement',
+    fol:'leafy greens, beans and lentils help'};
   let worst=null;
-  for(const[key,label,unit]of MICROS){
-    if(key==='caff')continue;
+  for(const[key,label,unit,,,isLimit]of MICROS){
+    if(isLimit)continue;
     const a=avgOver(lastNDays(7),key);
     if(!a||a.n<3)continue;
     const ratio=a.avg/microRDA(key);
@@ -1033,8 +1103,12 @@ function insightLines(){
   if(worst)out.push(['🥦','Try to increase your <b>'+worst.label.toLowerCase()+
     '</b> intake — averaging '+g1(worst.avg)+' '+worst.unit+' of the '+
     g1(microRDA(worst.key))+' '+worst.unit+' guideline; '+TIPS[worst.key]+'.']);
+  // ceiling nutrients: flag sustained overshoot
+  const na=avgOver(lastNDays(7),'sod');
+  if(na&&na.n>=3&&na.avg>microRDA('sod')*1.15)
+    out.push(['🧂','Sodium is averaging <b>'+kc(na.avg)+' mg/day</b> — above the '+kc(microRDA('sod'))+' mg guideline.']);
   const cf=avgOver(lastNDays(7),'caff');
-  if(cf&&cf.avg>400)out.push(['☕','Caffeine is averaging <b>'+kc(cf.avg)+' mg/day</b> — above the 400 mg guideline.']);
+  if(cf&&cf.avg>microRDA('caff'))out.push(['☕','Caffeine is averaging <b>'+kc(cf.avg)+' mg/day</b> — above the '+kc(microRDA('caff'))+' mg guideline.']);
   const q0=qualityAvg(lastNDays(7)),q1=qualityAvg(lastNDays(7,7));
   if(q0!=null){
     let txt='Food quality this week averages <b>'+gradeLetter(q0)+'</b>';
@@ -1042,7 +1116,7 @@ function insightLines(){
     else txt+='.';
     out.push(['🥗',txt]);
   }
-  return out.slice(0,4);
+  return out.slice(0,5);
 }
 function insightsCard(){
   const card=h('div',{class:'card'},h('h3',{class:'serif'},'Insights'));
@@ -1058,8 +1132,16 @@ function insightsCard(){
 
 function microCardEl(){
   const t=dayTotals(todayStr());
-  const card=h('div',{class:'card'},h('h3',{class:'serif'},'Micronutrients today'));
-  for(const[key,label,unit,,,isLimit]of MICROS){
+  const head=h('h3',{class:'serif'},'Micronutrients today',
+    h('button',{style:'float:right;font-size:13px;font-weight:700;color:var(--acc)',
+      onclick:microTargetsSheet},'Targets'));
+  const card=h('div',{class:'card'},head);
+  let group='';
+  for(const[key,label,unit,,,isLimit,grp]of MICROS){
+    if(grp!==group){
+      group=grp;
+      card.append(h('div',{class:'lbl',style:'margin-top:10px'},grp));
+    }
     const target=microRDA(key),v=t[key]||0;
     const pct=target>0?clamp(v/target,0,1):0;
     const over=isLimit&&v>target;
@@ -1073,6 +1155,28 @@ function microCardEl(){
   card.append(h('p',{class:'tiny dim',style:'margin-top:8px'},
     'From logged foods only — many products don’t declare micronutrients, so treat these as a floor, not an exact count.'));
   return card;
+}
+// custom per-micro daily targets (blank = sex-based default)
+function microTargetsSheet(){
+  const inputs={};
+  const body=h('div',{});
+  for(const[key,label,unit,dm,df,isLimit]of MICROS){
+    const def=S.set.prof.sex==='f'?df:dm;
+    inputs[key]=h('input',{class:'in num',inputmode:'decimal',
+      value:(S.set.microT||{})[key]||'',placeholder:def+' '+unit+(isLimit?' (limit)':'')});
+    body.append(labeled(label+' ('+unit+')',inputs[key]));
+  }
+  body.append(h('button',{class:'btn primary mt12',onclick:async()=>{
+    const mt={};
+    for(const key of Object.keys(inputs)){
+      const v=numOr(inputs[key].value,0);
+      if(v>0)mt[key]=v;
+    }
+    S.set.microT=mt;
+    await saveSet();
+    close();renderTab(S.tab);toast('Micro targets saved');
+  }},'Save targets'));
+  const close=sheet('Micronutrient targets',body);
 }
 
 function qualityCardEl(){
@@ -1152,11 +1256,15 @@ function mealGroupsEl(ds){
     const ens=entriesFor(ds).filter(e=>e.meal===mk);
     let sum={...ZERO};
     for(const e of ens)sum=addMac(sum,entryMacros(e));
+    const note=(S.notes[ds]||{})[mk];
     const head=h('div',{class:'mealhead'},
       h('h3',{},label),
       h('span',{class:'mk num'},ens.length?kc(sum.kcal)+' kcal':''),
+      h('button',{class:'madd',style:'background:none;color:'+(note?'var(--acc)':'var(--dim)'),
+        onclick:()=>noteSheet(ds,mk)},'✎'),
       h('button',{class:'madd',onclick:()=>{S.addCtx={date:ds,meal:mk};switchTab('add');}},'+'));
     const card=h('div',{class:'mealcard'});
+    if(note)card.append(h('div',{class:'note-line'},note));
     if(!ens.length)card.append(h('div',{class:'mealempty'},h('i',{},'Nothing logged yet — tap + to add')));
     else for(const en of ens)card.append(frRow(en));
     frag.append(h('div',{class:'mealgrp fadein'},head,card));
@@ -1174,7 +1282,7 @@ function frRow(en){
   const m=entryMacros(en);
   const sub=esc(amtLabel(en))+
     ' · <span class="mch"><span class="p">P<b>'+g1(m.p)+'</b></span>'+
-    '<span class="c">C<b>'+g1(m.c)+'</b></span>'+
+    '<span class="c">C<b>'+g1(dispC(m))+'</b></span>'+
     '<span class="f">F<b>'+g1(m.f)+'</b></span></span>';
   const mid=h('div',{class:'grow'},
     h('div',{class:'fr-name'},f?f.name:'(deleted food)'),
@@ -1276,14 +1384,19 @@ function offToFood(prod){
   const n=prod.nutriments||{};
   let kcal=n['energy-kcal_100g'];
   if(kcal==null&&n['energy_100g']!=null)kcal=n['energy_100g']/4.184;  // kJ fallback
-  const mg=v=>Math.round((+v||0)*100000)/100;   // OFF stores minerals in g → mg
+  const mg=v=>Math.round((+v||0)*100000)/100;   // OFF stores nutrients in g → mg
+  const ug=v=>Math.round((+v||0)*1e8)/100;      // g → µg (vitamins A/D/B12, folate)
   let p100=null;
   if(kcal!=null||n.proteins_100g!=null||n.carbohydrates_100g!=null){
     p100={...ZERO,kcal:+kcal||0,p:+n.proteins_100g||0,c:+n.carbohydrates_100g||0,
       f:+n.fat_100g||0,satf:+n['saturated-fat_100g']||0,
       fib:+n.fiber_100g||0,sug:+n.sugars_100g||0,
       sod:mg(n.sodium_100g),iron:mg(n.iron_100g),k:mg(n.potassium_100g),
-      ca:mg(n.calcium_100g),vitc:mg(n['vitamin-c_100g']),caff:mg(n.caffeine_100g)};
+      ca:mg(n.calcium_100g),mag:mg(n.magnesium_100g),zn:mg(n.zinc_100g),
+      vita:ug(n['vitamin-a_100g']),vitc:mg(n['vitamin-c_100g']),
+      vitd:ug(n['vitamin-d_100g']),vite:mg(n['vitamin-e_100g']),
+      b12:ug(n['vitamin-b12_100g']),fol:ug(n['folates_100g']!=null?n['folates_100g']:n['vitamin-b9_100g']),
+      caff:mg(n.caffeine_100g)};
   }
   let servG=parseFloat(prod.serving_quantity)||parseGramsFromLabel(prod.serving_size);
   let servLabel=(prod.serving_size||'').trim();
@@ -1296,7 +1409,11 @@ function offToFood(prod){
       satf:+n['saturated-fat_serving']||0,
       fib:+n.fiber_serving||0,sug:+n.sugars_serving||0,
       sod:mg(n.sodium_serving),iron:mg(n.iron_serving),k:mg(n.potassium_serving),
-      ca:mg(n.calcium_serving),vitc:mg(n['vitamin-c_serving']),caff:mg(n.caffeine_serving)};
+      ca:mg(n.calcium_serving),mag:mg(n.magnesium_serving),zn:mg(n.zinc_serving),
+      vita:ug(n['vitamin-a_serving']),vitc:mg(n['vitamin-c_serving']),
+      vitd:ug(n['vitamin-d_serving']),vite:mg(n['vitamin-e_serving']),
+      b12:ug(n['vitamin-b12_serving']),fol:ug(n['folates_serving']),
+      caff:mg(n.caffeine_serving)};
     if(servG)p100=scaleMac(per,100/servG);
     if(!servLabel)servLabel='1 serving';
   }
@@ -1360,7 +1477,8 @@ function qualityAvg(days){
    Settings accepts a personal key from fdc.nal.usda.gov to lift it).
    Search responses report nutrients per 100 g. */
 const FDC_NUTR={1008:'kcal',1003:'p',1005:'c',1004:'f',1258:'satf',1079:'fib',
-  2000:'sug',1093:'sod',1089:'iron',1092:'k',1087:'ca',1162:'vitc',1057:'caff'};
+  2000:'sug',1093:'sod',1089:'iron',1092:'k',1087:'ca',1090:'mag',1095:'zn',
+  1106:'vita',1162:'vitc',1114:'vitd',1109:'vite',1178:'b12',1177:'fol',1057:'caff'};
 const capWords=s=>{
   s=String(s).trim();
   if(s===s.toUpperCase())s=s.toLowerCase().replace(/(^|[\s(,/])([a-z])/g,(m,a,b)=>a+b.toUpperCase());
@@ -1470,17 +1588,12 @@ function addSec(title,note,action,onAction){
 }
 function foodRowBtn(f,tag,onclick){
   const per=f.per||ZERO;
-  const sub=(f.brand?f.brand+' · ':'')+(f.servLabel||'');
+  const subEl=h('div',{class:'fr-sub'},(f.brand?f.brand+' · ':'')+(f.servLabel||''));
+  // source tag lives in the subtitle so the grade + kcal columns stay aligned
+  if(tag)subEl.prepend(h('span',{class:'src-tag '+tag[1],style:'margin-right:6px'},tag[0]));
   const kcalEl=h('div',{class:'fr-kcal num'},h('b',{},kc(per.kcal)),h('span',{},'kcal'));
-  const mid=h('div',{class:'grow'},
-    h('div',{class:'fr-name'},f.name),
-    h('div',{class:'fr-sub'},sub));
-  const row=h('button',{class:'food-row',onclick},frThumb(f),mid);
-  const gb=gradeBadge(f);
-  if(gb)row.append(gb);
-  if(tag)row.append(h('span',{class:'src-tag '+tag[1]},tag[0]));
-  row.append(kcalEl);
-  return row;
+  const mid=h('div',{class:'grow'},h('div',{class:'fr-name'},f.name),subEl);
+  return h('button',{class:'food-row',onclick},frThumb(f),mid,gradeBadge(f),kcalEl);
 }
 function renderAddHome(){
   const box=$('#add-results');
@@ -1504,7 +1617,8 @@ function renderAddHome(){
   const mcard=h('div',{class:'listcard'});
   for(const m of mls)mcard.append(mealRowBtn(m));
   if(!mls.length)mcard.append(h('div',{class:'mealempty'},h('i',{},'Combine foods into one-tap meals')));
-  box.append(addSec('My Meals',null,'+ New',()=>recipeSheet()),mcard);
+  box.append(addSec('My Meals',null,'+ New',()=>recipeSheet()),mcard,
+    h('button',{class:'btn sm mt8',onclick:importRecipeSheet},'✂️ Import recipe from text'));
   const mine=[...S.foods.values()].filter(f=>f.src==='custom'&&!f.hidden)
     .sort((a,b)=>b.ts-a.ts);
   const fcard=h('div',{class:'listcard'});
@@ -1603,8 +1717,13 @@ function openLogSheet(food,ctx,existing){
   const amtIn=h('input',{class:'num',inputmode:'decimal',value:String(amt),oninput:e=>{amt=Math.max(numOr(e.target.value,0),0);upd(false);}});
   function upd(setInput){
     const m=unit==='g'&&food.p100?scaleMac(food.p100,amt/100):scaleMac(food.per,amt);
+    // macro-math reporting: kcal recomputed from P/C/F, flagged when the
+    // label energy disagrees noticeably (usually rounding or fibre policy)
+    const mm=Math.round(m.p*4+m.c*4+m.f*9);
+    const off15=m.kcal>20&&Math.abs(mm-m.kcal)/m.kcal>.15;
     preview.innerHTML='<div style="text-align:center"><div class="num" style="font-size:30px;font-weight:800;letter-spacing:-.5px">'+kc(m.kcal)+'<span class="dim" style="font-size:13px;font-weight:600"> kcal</span></div>'+
-      '<div class="mch" style="font-size:13px;gap:12px;justify-content:center"><span class="p">P <b>'+g1(m.p)+'g</b></span><span class="c">C <b>'+g1(m.c)+'g</b></span><span class="f">F <b>'+g1(m.f)+'g</b></span></div></div>';
+      '<div class="mch" style="font-size:13px;gap:12px;justify-content:center"><span class="p">P <b>'+g1(m.p)+'g</b></span><span class="c">C <b>'+g1(dispC(m))+'g</b></span><span class="f">F <b>'+g1(m.f)+'g</b></span></div>'+
+      '<div class="tiny dim" style="margin-top:5px">Macro math: '+mm+' kcal'+(off15?' — label differs ⚠️':'')+'</div></div>';
     if(setInput)amtIn.value=String(Math.round(amt*100)/100);
   }
   const step=d=>{const inc=unit==='g'?(d>0?10:-10):(d>0?.5:-.5);amt=Math.max(Math.round((amt+inc)*100)/100,0);upd(true);};
@@ -1682,13 +1801,19 @@ function customFoodSheet(existing,prefill,onSaved){
         sodI=in_(f.per.sod||'','mg',true),satfI=in_(f.per.satf||'','g',true),
         ironI=in_(f.per.iron||'','mg',true),kI2=in_(f.per.k||'','mg',true),
         caI=in_(f.per.ca||'','mg',true),vitcI=in_(f.per.vitc||'','mg',true),
-        caffI=in_(f.per.caff||'','mg',true);
+        caffI=in_(f.per.caff||'','mg',true),magI=in_(f.per.mag||'','mg',true),
+        znI=in_(f.per.zn||'','mg',true),vitaI=in_(f.per.vita||'','µg',true),
+        vitdI=in_(f.per.vitd||'','µg',true),viteI=in_(f.per.vite||'','mg',true),
+        b12I=in_(f.per.b12||'','µg',true),folI=in_(f.per.fol||'','µg',true);
   const more=h('div',{style:'display:none'},
     h('div',{class:'grid2'},labeled('Sat. fat (g)',satfI),labeled('Fibre (g)',fibI)),
     h('div',{class:'grid2 mt8'},labeled('Sugar (g)',sugI),labeled('Sodium (mg)',sodI)),
     h('div',{class:'grid2 mt8'},labeled('Iron (mg)',ironI),labeled('Potassium (mg)',kI2)),
-    h('div',{class:'grid2 mt8'},labeled('Calcium (mg)',caI),labeled('Vitamin C (mg)',vitcI)),
-    labeled('Caffeine (mg)',caffI));
+    h('div',{class:'grid2 mt8'},labeled('Calcium (mg)',caI),labeled('Magnesium (mg)',magI)),
+    h('div',{class:'grid2 mt8'},labeled('Zinc (mg)',znI),labeled('Vitamin A (µg)',vitaI)),
+    h('div',{class:'grid2 mt8'},labeled('Vitamin C (mg)',vitcI),labeled('Vitamin D (µg)',vitdI)),
+    h('div',{class:'grid2 mt8'},labeled('Vitamin E (mg)',viteI),labeled('B12 (µg)',b12I)),
+    h('div',{class:'grid2 mt8'},labeled('Folate (µg)',folI),labeled('Caffeine (mg)',caffI)));
   const moreBtn=h('button',{class:'btn sm mt8',onclick:()=>{
     more.style.display=more.style.display==='none'?'block':'none';
   }},'More nutrients…');
@@ -1701,8 +1826,10 @@ function customFoodSheet(existing,prefill,onSaved){
     f.per={...ZERO,kcal:numOr(kI.value,0),p:numOr(pI.value,0),c:numOr(cI.value,0),
       f:numOr(fI.value,0),satf:numOr(satfI.value,0),fib:numOr(fibI.value,0),
       sug:numOr(sugI.value,0),sod:numOr(sodI.value,0),iron:numOr(ironI.value,0),
-      k:numOr(kI2.value,0),ca:numOr(caI.value,0),vitc:numOr(vitcI.value,0),
-      caff:numOr(caffI.value,0)};
+      k:numOr(kI2.value,0),ca:numOr(caI.value,0),mag:numOr(magI.value,0),
+      zn:numOr(znI.value,0),vita:numOr(vitaI.value,0),vitc:numOr(vitcI.value,0),
+      vitd:numOr(vitdI.value,0),vite:numOr(viteI.value,0),b12:numOr(b12I.value,0),
+      fol:numOr(folI.value,0),caff:numOr(caffI.value,0)};
     // per-100g basis derived when the serving weight is known
     f.p100=f.servG?scaleMac(f.per,100/f.servG):null;
     if(existing)f.edited=1;
@@ -1816,6 +1943,82 @@ function recipeSheet(existing){
   const close=sheet(existing?'Edit meal':'New meal',body);
   redraw();
 }
+/* recipe importer: paste ingredient lines → parse quantities → best-effort
+   match against the local library → hand off to the meal builder */
+function parseIngredient(line){
+  line=line.replace(/^[-*•\d]+[.)]\s*/,'').trim();
+  if(!line)return null;
+  let m=line.match(/^([\d.,]+)\s*(g|grams?|ml|kg)\b\s*(?:of\s+)?(.+)$/i);
+  if(m){
+    let amt=parseFloat(m[1].replace(',','.'));
+    if(/kg/i.test(m[2]))amt*=1000;
+    return {amt,unit:'g',name:m[3].trim()};
+  }
+  m=line.match(/^(\d+\/\d+|[\d.,]+)\s*(?:x|×)?\s+(.+)$/);
+  if(m){
+    let amt=m[1].includes('/')
+      ?(+m[1].split('/')[0]/+m[1].split('/')[1])
+      :parseFloat(m[1].replace(',','.'));
+    return {amt:amt||1,unit:'serv',name:m[2].trim()};
+  }
+  return {amt:1,unit:'serv',name:line};
+}
+function matchFood(name){
+  const toks=name.toLowerCase().split(/[^a-zà-ÿ]+/).filter(t=>t.length>2);
+  if(!toks.length)return null;
+  let best=null,bs=0;
+  for(const f of S.foods.values()){
+    if(f.hidden)continue;
+    const fn=(f.name+' '+(f.brand||'')).toLowerCase();
+    let s=0;
+    for(const t of toks)if(fn.includes(t))s+=t.length;
+    if(s>bs||(s===bs&&best&&(f.used||0)>(best.used||0))){bs=s;best=f;}
+  }
+  return bs>=3?best:null;
+}
+function importRecipeSheet(){
+  const ta=h('textarea',{class:'in',rows:6,
+    placeholder:'One ingredient per line:\n150g chicken breast\n1 banana\n2 eggs\n30 g oats'});
+  const out=h('div',{class:'listcard mt8'});
+  let parsed=[];
+  function showParsed(){
+    out.innerHTML='';
+    parsed.forEach((p,i)=>{
+      const mid=h('div',{class:'grow'},
+        h('div',{class:'fr-name'},p.food?p.food.name:'“'+p.name+'”'),
+        h('div',{class:'fr-sub'},(p.unit==='g'?g1(p.amt)+' g':g1(p.amt)+' × serving')+
+          (p.food?'':' · no match — tap to pick')));
+      const row=h('button',{class:'food-row',onclick:()=>pickFoodSheet(f=>{p.food=f;showParsed();})},
+        h('div',{class:'fr-thumb',style:p.food?'':'background:rgba(255,92,92,.14);color:var(--red)'},p.food?p.food.name[0].toUpperCase():'?'),
+        mid);
+      out.append(row);
+    });
+  }
+  const parseBtn=h('button',{class:'btn sm mt8',onclick:()=>{
+    parsed=ta.value.split('\n').map(parseIngredient).filter(Boolean);
+    for(const p of parsed)p.food=matchFood(p.name);
+    if(!parsed.length){toast('Paste some ingredients first');return;}
+    showParsed();
+    goBtn.style.display='';
+  }},'Parse ingredients');
+  const goBtn=h('button',{class:'btn primary mt12',style:'display:none',onclick:()=>{
+    const items=[];
+    for(const p of parsed){
+      if(!p.food)continue;
+      // gram amounts need per-100g data; otherwise fall back to servings
+      if(p.unit==='g'&&p.food.p100&&p.food.servG)items.push({foodId:p.food.id,amt:p.amt,unit:'g'});
+      else items.push({foodId:p.food.id,amt:p.unit==='g'?1:p.amt,unit:'serv'});
+    }
+    if(!items.length){toast('No matched ingredients yet');return;}
+    close();
+    recipeSheet({id:'m'+uid(),name:'',items,ts:Date.now(),used:0,lastUsed:0});
+  }},'Continue to meal builder');
+  const close=sheet('Import recipe',h('div',{},
+    h('p',{class:'small dim',style:'margin:0 2px 8px'},
+      'Paste an ingredient list — quantities are parsed and matched against your library (best-effort). Unmatched lines can be picked by hand.'),
+    ta,parseBtn,out,goBtn));
+}
+
 function logMealSheet(m){
   const ctx=S.addCtx||{date:todayStr(),meal:mealGuess()};
   let meal=ctx.meal;
@@ -1972,7 +2175,7 @@ function renderDiary(){
     pg.append(h('div',{class:'pastbanner'},
       h('span',{class:'grow'},'Editing '+fmtDayLong(ds)+' — totals & charts recalculate instantly')));
   }
-  const t=dayTotals(ds),tg=S.set.t;
+  const t=dayTotals(ds),tg=targetFor(ds);
   const tile=(v,target,label,unit)=>h('div',{class:'ds num'},
     h('b',{},unit==='g'?g1(v):kc(v)),
     h('span',{},label),
@@ -1980,11 +2183,35 @@ function renderDiary(){
   pg.append(h('div',{class:'daysum'},
     tile(t.kcal,tg.kcal,'kcal',''),
     tile(t.p,tg.p,'protein','g'),
-    tile(t.c,tg.c,'carbs','g'),
+    tile(dispC(t),tg.c,carbLbl().toLowerCase(),'g'),
     tile(t.f,tg.f,'fat','g')));
+  // day note (premium-parity: day & meal notes)
+  const dn=(S.notes[ds]||{}).day;
+  pg.append(h('button',{class:dn?'note-line daynote':'btn sm mb8',
+    onclick:()=>noteSheet(ds,'day')},dn?'✎ '+dn:'✎ Add a note to this day'));
   pg.append(h('button',{class:'btn sm mb8',onclick:()=>copyDaySheet(ds)},
     '⧉ Copy another day’s entries here'));
   pg.append(mealGroupsEl(ds));
+}
+/* one note per day + per meal slot, stored in kv 'notes':
+   {date:{day:'…', b:'…', l:'…', …}} — included in backups */
+async function saveNotes(){await kvPut('notes',S.notes);}
+function noteSheet(ds,slot){
+  const cur=(S.notes[ds]||{})[slot]||'';
+  const ta=h('textarea',{class:'in',rows:4,placeholder:slot==='day'
+    ?'How did the day go? Hunger, energy, context…'
+    :'e.g. ate out, estimated portions'},cur);
+  const save=h('button',{class:'btn primary mt12',onclick:async()=>{
+    const v=ta.value.trim();
+    if(!S.notes[ds])S.notes[ds]={};
+    if(v)S.notes[ds][slot]=v;
+    else{delete S.notes[ds][slot];if(!Object.keys(S.notes[ds]).length)delete S.notes[ds];}
+    await saveNotes();
+    close();renderTab(S.tab);
+    toast(v?'Note saved':'Note removed');
+  }},'Save note');
+  const close=sheet(slot==='day'?'Note · '+fmtDay(ds):'Note · '+(MEAL_NAME[slot]||''),
+    h('div',{},ta,save));
 }
 
 /* ---------------- Progress tab ---------------- */
@@ -2059,22 +2286,24 @@ function renderProgress(){
   g.addColorStop(0,acc+'3A');g.addColorStop(1,acc+'02');
   CH.kcal=new Chart(c1.cv,{type:'line',
     data:{labels,datasets:[
-      {data:days.map(()=>tg.kcal),borderColor:cssVar('--dim')+'70',borderWidth:1.5,
+      {data:days.map(d=>targetFor(d).kcal),borderColor:cssVar('--dim')+'70',borderWidth:1.5,
        borderDash:[5,5],pointRadius:0,fill:false},
       ...glowPair(kcals,acc,g)]},
     options:baseOpts()});
   // macro trend (grams)
   const c2=chartCard('Macros (g)');
   pg.append(c2.card);
-  const mmap=k=>days.map(d=>entriesFor(d).length?Math.round(dayTotals(d)[k]):null);
+  const mmap=k=>days.map(d=>entriesFor(d).length
+    ?Math.round(k==='c'?dispC(dayTotals(d)):dayTotals(d)[k]):null);
   CH.mac=new Chart(c2.cv,{type:'line',
     data:{labels,datasets:[
       ...glowPair(mmap('p'),mp),...glowPair(mmap('c'),mc),...glowPair(mmap('f'),mf)]},
     options:baseOpts()});
   c2.card.append(h('div',{class:'mch',style:'justify-content:center;display:flex;gap:16px;margin-top:8px;font-size:12px'},
     h('span',{class:'p'},'— ',h('b',{},'Protein')),
-    h('span',{class:'c'},'— ',h('b',{},'Carbs')),
+    h('span',{class:'c'},'— ',h('b',{},carbLbl())),
     h('span',{class:'f'},'— ',h('b',{},'Fat'))));
+  pg.append(topSourcesCard(days));
   // today's macro split donut (kcal contribution: P/C 4 kcal/g, F 9 kcal/g)
   const tt=dayTotals(todayStr());
   const cals=[tt.p*4,tt.c*4,tt.f*9];
@@ -2119,6 +2348,41 @@ function renderProgress(){
       h('div',{class:'serif'},'No weigh-ins yet'),
       h('p',{},'Tap + Log to start your trend line.')));
   }
+}
+/* which foods delivered the most of a nutrient across the selected range */
+function topSourcesCard(days){
+  const opts=[['p','Protein','g'],['c','Carbs','g'],['f','Fat','g'],['satf','Sat. fat','g'],
+    ['fib','Fibre','g'],['sug','Sugar','g'],
+    ...MICROS.map(m=>[m[0],m[1],m[2]])];
+  let cur='p';
+  const card=h('div',{class:'card'},h('h3',{class:'serif'},'Top sources'));
+  const sel=h('select',{class:'in',onchange:e=>{cur=e.target.value;fill();}});
+  for(const[k,label]of opts)sel.append(h('option',{value:k},label));
+  const list=h('div',{class:'mt8'});
+  card.append(sel,list);
+  function fill(){
+    list.innerHTML='';
+    const sums=new Map();
+    let total=0;
+    for(const ds of days)for(const en of entriesFor(ds)){
+      const v=entryMacros(en)[cur]||0;
+      if(v<=0)continue;
+      sums.set(en.foodId,(sums.get(en.foodId)||0)+v);
+      total+=v;
+    }
+    const top=[...sums.entries()].sort((a,b)=>b[1]-a[1]).slice(0,5);
+    const unit=opts.find(o=>o[0]===cur)[2];
+    for(const[fid,v]of top){
+      const f=S.foods.get(fid);
+      list.append(h('div',{class:'microrow'},
+        h('span',{class:'ml',style:'flex:0 0 118px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text)'},f?f.name:'?'),
+        h('div',{class:'mbar'},h('div',{class:'mfill',style:'width:'+Math.max(Math.round(v/total*100),3)+'%'})),
+        h('span',{class:'mv num'},g1(v)+' '+unit)));
+    }
+    if(!top.length)list.append(h('p',{class:'small dim',style:'margin-top:6px'},'Nothing logged in this range yet.'));
+  }
+  fill();
+  return card;
 }
 const h2s=(w,n)=>n===1?w:w+'s';
 const fmtDayShortP=ds=>{const d=new Date(ds+'T12:00');return d.toLocaleDateString(undefined,{day:'numeric',month:'short'});};
@@ -2281,6 +2545,137 @@ function targetsSheet(){
   const close=sheet('Daily targets',h('div',{},modeSeg,holder));
 }
 
+/* training-day targets: alternate macro goals on chosen weekdays */
+function trainingSheet(){
+  let on=!!S.set.t2;
+  const days=new Set(S.set.t2days||[]);
+  const t2={...(S.set.t2||S.set.t)};
+  const WD=['S','M','T','W','T','F','S'];
+  const holder=h('div',{});
+  const dayRow=h('div',{class:'chips mt8'});
+  WD.forEach((w,i)=>{
+    const b=h('button',{class:'chip',style:days.has(i)?'background:var(--acc);color:#fff;border-color:var(--acc)':'',
+      onclick:()=>{
+        if(days.has(i))days.delete(i);else days.add(i);
+        b.style.cssText=days.has(i)?'background:var(--acc);color:#fff;border-color:var(--acc)':'';
+      }},w);
+    dayRow.append(b);
+  });
+  const kI=h('input',{class:'in num',inputmode:'numeric',value:String(t2.kcal)});
+  const pI=h('input',{class:'in num',inputmode:'numeric',value:String(t2.p)});
+  const cI=h('input',{class:'in num',inputmode:'numeric',value:String(t2.c)});
+  const fI=h('input',{class:'in num',inputmode:'numeric',value:String(t2.f)});
+  function fillHolder(){
+    holder.innerHTML='';
+    if(!on)return;
+    holder.append(
+      h('label',{class:'lbl'},'Training weekdays'),dayRow,
+      h('div',{class:'grid2 mt12'},labeled('Calories',kI),labeled('Protein (g)',pI)),
+      h('div',{class:'grid2 mt8'},labeled('Carbs (g)',cI),labeled('Fat (g)',fI)));
+  }
+  const body=h('div',{},
+    h('p',{class:'small dim',style:'margin:0 2px 10px'},
+      'Different goals on the days you train — rings, stars, streaks and charts all follow the day’s own targets.'),
+    seg([[0,'Off'],[1,'On']],on?1:0,v=>{on=!!v;fillHolder();}),
+    holder,
+    h('button',{class:'btn primary mt12',onclick:async()=>{
+      if(on&&!days.size){toast('Pick at least one weekday');return;}
+      S.set.t2=on?{kcal:numOr(kI.value,S.set.t.kcal),p:numOr(pI.value,S.set.t.p),
+        c:numOr(cI.value,S.set.t.c),f:numOr(fI.value,S.set.t.f)}:null;
+      S.set.t2days=on?[...days]:[];
+      await saveSet();
+      close();renderTab(S.tab);
+      toast(on?'Training-day targets on':'Training-day targets off');
+    }},'Save'));
+  fillHolder();
+  const close=sheet('Training-day targets',body);
+}
+
+/* auto-repeating daily foods manager */
+function autoLogSheet(){
+  const list=h('div',{class:'listcard mt8'});
+  function redraw(){
+    list.innerHTML='';
+    (S.set.autoLog||[]).forEach((r,i)=>{
+      const f=S.foods.get(r.foodId);
+      const mid=h('div',{class:'grow'},
+        h('div',{class:'fr-name'},f?f.name:'(missing food)'),
+        h('div',{class:'fr-sub'},(r.unit==='g'?g1(r.amt)+' g':g1(r.amt)+' × serving')+' → '+(MEAL_NAME[r.meal]||r.meal)));
+      const del=h('button',{style:'color:var(--red);padding:0 8px;font-size:16px',onclick:async()=>{
+        S.set.autoLog.splice(i,1);await saveSet();redraw();
+      }},'✕');
+      list.append(h('div',{class:'food-row'},mid,del));
+    });
+    if(!(S.set.autoLog||[]).length)
+      list.append(h('div',{class:'mealempty'},h('i',{},'Supplements, morning coffee, daily whey — logged automatically each day')));
+  }
+  const add=h('button',{class:'btn sm mt8',onclick:()=>pickFoodSheet(f=>{
+    let amt=1,meal='b';
+    const amtI=h('input',{class:'in num',inputmode:'decimal',value:'1',
+      oninput:e=>{amt=Math.max(numOr(e.target.value,1),0);}});
+    const body2=h('div',{},
+      labeled('Servings',amtI),
+      labeled('Meal',seg(MEALS,meal,v=>meal=v)),
+      h('button',{class:'btn primary mt12',onclick:async()=>{
+        S.set.autoLog=S.set.autoLog||[];
+        S.set.autoLog.push({foodId:f.id,amt:amt||1,unit:'serv',meal});
+        // if today's auto-run already happened, log the new rule now too
+        if(S.set.autoDate===todayStr())
+          await logEntry({date:todayStr(),meal,foodId:f.id,amt:amt||1,unit:'serv'});
+        await saveSet();
+        close2();redraw();
+        toast('Will auto-log daily');
+      }},'Add daily item'));
+    const close2=sheet(f.name,body2);
+  })},'+ Add daily food');
+  const body=h('div',{},
+    h('p',{class:'small dim',style:'margin:0 2px'},
+      'These get logged automatically the first time MacroLog opens each day.'),
+    list,add);
+  sheet('Auto-log daily',body);
+  redraw();
+}
+
+/* meal slot editor: rename the core four, add up to two extra slots */
+function mealSlotsSheet(){
+  const slots=MEALS.map(x=>[...x]);
+  const list=h('div',{class:'mt8'});
+  function redraw(){
+    list.innerHTML='';
+    slots.forEach((sl,i)=>{
+      const inp=h('input',{class:'in',value:sl[1],oninput:e=>{sl[1]=e.target.value;}});
+      const row=h('div',{class:'row mb8'},inp);
+      if(sl[0].startsWith('x')){
+        const used=S.entries.some(e=>e.meal===sl[0]);
+        row.append(h('button',{style:'color:'+(used?'var(--dim)':'var(--red)')+';padding:0 8px;font-size:16px',
+          onclick:()=>{
+            if(used){toast('This slot has diary entries — move them first');return;}
+            slots.splice(i,1);redraw();
+          }},'✕'));
+      }
+      list.append(row);
+    });
+    if(slots.length<6)list.append(h('button',{class:'btn sm',onclick:()=>{
+      const id=slots.some(s=>s[0]==='x1')?'x2':'x1';
+      slots.push([id,'Snack 2']);redraw();
+    }},'+ Add a slot'));
+  }
+  const body=h('div',{},
+    h('p',{class:'small dim',style:'margin:0 2px 4px'},
+      'Rename slots (they apply to all history) or add up to two extras — e.g. Pre-workout.'),
+    list,
+    h('button',{class:'btn primary mt12',onclick:async()=>{
+      for(const sl of slots)if(!sl[1].trim()){toast('Slots need names');return;}
+      S.set.meals=slots.map(s=>[s[0],s[1].trim()]);
+      applyMeals();
+      await saveSet();
+      close();renderTab(S.tab);
+      toast('Meal slots saved');
+    }},'Save slots'));
+  const close=sheet('Meal slots',body);
+  redraw();
+}
+
 /* ---------------- Settings tab ---------------- */
 function renderSettings(){
   const pg=$('#pg-settings');pg.innerHTML='';
@@ -2295,7 +2690,17 @@ function renderSettings(){
       h('div',{class:'ds num'},h('b',{},g1(t.p)),h('span',{},'protein')),
       h('div',{class:'ds num'},h('b',{},g1(t.c)),h('span',{},'carbs')),
       h('div',{class:'ds num'},h('b',{},g1(t.f)),h('span',{},'fat'))),
-    h('button',{class:'btn sm',onclick:targetsSheet},'Edit targets')));
+    h('button',{class:'btn sm',onclick:targetsSheet},'Edit targets'),
+    h('button',{class:'btn sm mt8',onclick:trainingSheet},
+      S.set.t2?'Training-day targets · '+(S.set.t2days||[]).length+' day/wk':'Training-day targets…')));
+  // tracking preferences
+  pg.append(h('div',{class:'card'},h('h3',{class:'serif'},'Tracking'),
+    labeled('Carbohydrates',seg([[0,'Total carbs'],[1,'Net carbs (− fibre)']],S.set.netCarbs?1:0,async v=>{
+      S.set.netCarbs=v;await saveSet();})),
+    h('button',{class:'btn sm mt12',onclick:autoLogSheet},
+      '⟳ Auto-log daily foods'+((S.set.autoLog||[]).length?' · '+S.set.autoLog.length:'…')),
+    h('button',{class:'btn sm mt8',onclick:microTargetsSheet},'Micronutrient targets…'),
+    h('button',{class:'btn sm mt8',onclick:mealSlotsSheet},'Meal slots & names…')));
   // appearance
   const sw=h('div',{class:'swatches mt8'});
   for(const[key,cols]of Object.entries(ACCENTS)){
@@ -2313,6 +2718,7 @@ function renderSettings(){
     h('p',{class:'small dim',style:'margin:0 2px 10px'},
       S.entries.length+' diary entries · '+S.foods.size+' foods · '+S.meals.length+' meals · '+S.body.length+' weigh-ins'),
     h('button',{class:'btn sm',onclick:downloadExport},'Export backup (JSON)'),
+    h('button',{class:'btn sm mt8',onclick:downloadCSV},'Download food log (CSV)'),
     h('button',{class:'btn sm mt8',onclick:importSheet},'Import backup…'),
     h('button',{class:'btn danger sm mt8',onclick:wipeAll},'Erase everything'),
     labeled('USDA API key (optional)',h('input',{class:'in',value:S.set.fdcKey||'',
@@ -2332,7 +2738,23 @@ function renderSettings(){
 function buildExportData(){
   return {app:'macrolog',ver:APP_VER,exported:new Date().toISOString(),
     settings:S.set,foods:[...S.foods.values()],entries:S.entries,
-    meals:S.meals,body:S.body};
+    meals:S.meals,body:S.body,notes:S.notes};
+}
+/* CSV food log (spreadsheet-friendly flat export of every entry) */
+function downloadCSV(){
+  const q=v=>'"'+String(v==null?'':v).replace(/"/g,'""')+'"';
+  const lines=[['date','meal','food','brand','amount','unit',...Object.keys(ZERO)].join(',')];
+  const sorted=[...S.entries].sort((a,b)=>a.date<b.date?-1:a.date>b.date?1:a.ts-b.ts);
+  for(const en of sorted){
+    const f=S.foods.get(en.foodId),m=entryMacros(en);
+    lines.push([en.date,q(MEAL_NAME[en.meal]||en.meal),q(f?f.name:'?'),q(f?f.brand||'':''),
+      en.amt,en.unit,...Object.keys(ZERO).map(k=>Math.round((m[k]||0)*100)/100)].join(','));
+  }
+  const blob=new Blob([lines.join('\r\n')],{type:'text/csv'});
+  const a=h('a',{href:URL.createObjectURL(blob),download:'macrolog-foodlog-'+todayStr()+'.csv'});
+  document.body.append(a);a.click();
+  setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove();},2000);
+  toast('Food log downloaded ('+sorted.length+' rows)');
 }
 function downloadExport(){
   const blob=new Blob([JSON.stringify(buildExportData(),null,1)],{type:'application/json'});
@@ -2355,9 +2777,25 @@ async function applyImport(data){
   const inc=data.settings||{};
   S.set={...DEF,...inc,t:{...DEF.t,...(inc.t||{})},prof:{...DEF.prof,...(inc.prof||{})}};
   await kvPut('settings',S.set);
+  await kvPut('notes',data.notes||{});
   await loadAll();
   applyTheme();
   return {entries:(data.entries||[]).length,foods:(data.foods||[]).length};
+}
+/* auto-repeating daily foods: rules in settings.autoLog are logged once per
+   day, the first time the app runs that day (supplements, staple breakfasts) */
+async function applyAutoLog(){
+  const today=todayStr();
+  if(S.set.autoDate===today||!(S.set.autoLog||[]).length)return;
+  let n=0;
+  for(const r of S.set.autoLog){
+    if(!S.foods.get(r.foodId))continue;
+    await logEntry({date:today,meal:r.meal,foodId:r.foodId,amt:r.amt,unit:r.unit});
+    n++;
+  }
+  S.set.autoDate=today;
+  await saveSet();
+  if(n)toast('⟳ Auto-logged '+n+' daily item'+(n===1?'':'s'));
 }
 function importSheet(){
   const file=h('input',{type:'file',accept:'.json,application/json',style:'display:none',
@@ -2458,12 +2896,15 @@ function applyTheme(){
 
 /* ---------------- load & boot ---------------- */
 async function loadAll(){
-  const[foods,entries,meals,body,set]=await Promise.all([
-    allOf('foods'),allOf('entries'),allOf('meals'),allOf('body'),kvGet('settings')]);
+  const[foods,entries,meals,body,set,notes]=await Promise.all([
+    allOf('foods'),allOf('entries'),allOf('meals'),allOf('body'),
+    kvGet('settings'),kvGet('notes')]);
   S.foods=new Map(foods.map(f=>[f.id,derivePer({...FOOD_DEF,...f})]));
   S.entries=entries;S.meals=meals;S.body=body;
+  S.notes=notes||{};
   const inc=set||{};
   S.set={...DEF,...inc,t:{...DEF.t,...(inc.t||{})},prof:{...DEF.prof,...(inc.prof||{})}};
+  applyMeals();
   reindex();
   // seed backfill + refresh: hidden/edited seed records persist as
   // tombstones (presence check can never resurrect a deleted staple), and
@@ -2497,6 +2938,7 @@ async function boot(){
   applyTheme();
   buildNav();
   S.date=todayStr();
+  await applyAutoLog();
   addEventListener('online',()=>netSet(false));
   addEventListener('offline',()=>netSet(true));
   netSet(!navigator.onLine);
@@ -2549,6 +2991,7 @@ async function boot(){
     fixShell();
     if(todayStr()!==lastDay){
       lastDay=todayStr();
+      applyAutoLog().then(()=>{if(S.tab==='today'||S.tab==='diary')renderTab(S.tab);}).catch(()=>{});
       if(S.tab==='today')switchTab('today');
     }
   },1000);
