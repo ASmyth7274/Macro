@@ -424,6 +424,33 @@ input[type=checkbox]{accent-color:var(--acc);width:20px;height:20px}
 .gr-a{background:#038141}.gr-b{background:#85BB2F}.gr-c{background:#F5B62E;color:#4a3a00}
 .gr-d{background:#EF7E1A}.gr-e{background:#E63E11}
 .gr.big{width:44px;height:44px;border-radius:14px;font-size:22px}
+/* additive-count pill (colour = worst risk class) */
+.ab{display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto;
+  min-width:22px;height:22px;border-radius:7px;font-size:11px;font-weight:800;padding:0 5px}
+.ab-0{background:rgba(47,214,113,.15);color:#2fd671}
+.ab-1{background:rgba(245,182,46,.16);color:#d99a13}
+.ab-2{background:rgba(239,126,26,.16);color:#EF7E1A}
+.ab-3{background:rgba(230,62,17,.16);color:#ff6b4a}
+body.light .ab-3{color:#d63515}body.light .ab-0{color:#1d9e52}
+/* additive detail rows (log sheet + day summary) */
+.addrow{display:flex;align-items:center;gap:9px;padding:6px 2px;font-size:13px}
+.addrow+.addrow{border-top:1px solid var(--line)}
+.addrow .adot{width:9px;height:9px;border-radius:5px;flex:0 0 auto}
+.addrow .an{flex:1;min-width:0;font-weight:600}
+.addrow .an small{color:var(--dim);font-weight:600;margin-left:5px}
+.addrow .ar{font-size:11.5px;font-weight:700;color:var(--dim)}
+/* full-nutrition table in the log sheet */
+.nutrow{display:flex;align-items:baseline;gap:8px;padding:5.5px 2px;font-size:13px}
+.nutrow+.nutrow{border-top:1px solid var(--line)}
+.nutrow .nl{flex:1;color:var(--dim);font-weight:600}
+.nutrow .nv{font-weight:700}
+.nutrow .nr{flex:0 0 74px;text-align:right;font-size:11.5px;color:var(--dim)}
+.nutrow.sub .nl{padding-left:12px}
+/* day-summary macro split donut */
+.splitwrap{display:flex;align-items:center;gap:16px;padding:4px 2px}
+.splitwrap svg{width:92px;height:92px;flex:0 0 auto;transform:rotate(-90deg)}
+.splitleg{display:flex;flex-direction:column;gap:6px;font-size:13px}
+.splitleg .row{gap:8px}
 /* ---------- misc states ---------- */
 .empty{text-align:center;padding:34px 20px;color:var(--dim)}
 .empty .serif{font-size:19px;font-style:italic;color:var(--text);margin-bottom:6px}
@@ -490,7 +517,7 @@ input[type=checkbox]{accent-color:var(--acc);width:20px;height:20px}
                          prof:{age,sex,cm,kg,act}, onboard, seedVer}
    Export/import = JSON snapshot of all stores (order-insensitive verify).
    ================================================================== */
-const APP_VER='2.1';   // shown in Settings — check which build a device runs
+const APP_VER='2.2';   // shown in Settings — check which build a device runs
 const DB_NAME='macrolog';
 /* meal slots are user-configurable (rename the core four, add up to two
    extras) — entries store the slot id, so renames apply retroactively */
@@ -564,7 +591,8 @@ const ACTIVITIES=[[1.2,'Sedentary — desk job, little exercise'],
    future seed migration from clobbering them (IronLog seed rule). */
 const SF=(id,name,p100,servLabel,servG,extra)=>({
   id,src:'seed',name,brand:'',per:null,servLabel,servG,
-  p100:{...ZERO,...p100},thumb:null,ts:0,used:0,lastUsed:0,hidden:0,edited:0,...extra});
+  p100:{...ZERO,...p100},thumb:null,adds:[],   // whole foods: additive-free by definition
+  ts:0,used:0,lastUsed:0,hidden:0,edited:0,...extra});
 const SEED_FOODS=[
 SF('s01','Chicken Breast (cooked)',{kcal:165,p:31,c:0,f:3.6,satf:1,iron:1,k:256,ca:15},'100 g',100),
 SF('s02','Egg (whole)',{kcal:143,p:12.6,c:0.7,f:9.5,satf:3.1,iron:1.8,k:138,ca:56},'1 large egg (50g)',50),
@@ -596,6 +624,69 @@ SF('s27','Honey',{kcal:304,p:0.3,c:82.4,f:0,sug:82.1,k:52},'1 tbsp (21g)',21),
 SF('s28','Tortilla Wrap',{kcal:310,p:8.5,c:50,f:8,satf:3.5,fib:3,sod:640,iron:3,k:130,ca:150},'1 wrap (64g)',64),
 SF('s29','Black Coffee (brewed)',{kcal:1,p:.1,c:0,f:0,k:49,caff:40},'1 mug (240ml)',240),
 SF('s30','Green Tea (brewed)',{kcal:1,p:0,c:0,f:0,caff:12},'1 mug (240ml)',240),
+/* v2.2 whole-food expansion (USDA FDC per-100g, micros inline) — fills the
+   fresh-produce gap the product databases leave (peppers, cucumber, tomato…)
+   and gives the recipe importer honest matches for plain ingredients. */
+// — vegetables —
+SF('s31','Bell Pepper (red)',{kcal:31,p:1,c:6,f:.3,fib:2.1,sug:4.2,k:211,mag:12,vita:157,vitc:128,vite:1.6,fol:46},'1 pepper (150g)',150),
+SF('s32','Cucumber',{kcal:15,p:.7,c:3.6,f:.1,fib:.5,sug:1.7,k:147,ca:16,mag:13,vitc:2.8,fol:7},'½ cucumber (150g)',150),
+SF('s33','Tomato',{kcal:18,p:.9,c:3.9,f:.2,fib:1.2,sug:2.6,k:237,mag:11,vita:42,vitc:13.7,vite:.5,fol:15},'1 medium (123g)',123),
+SF('s34','Carrot',{kcal:41,p:.9,c:9.6,f:.2,fib:2.8,sug:4.7,k:320,ca:33,mag:12,vita:835,vitc:5.9},'1 medium (61g)',61),
+SF('s35','Onion',{kcal:40,p:1.1,c:9.3,f:.1,fib:1.7,sug:4.2,k:146,ca:23,mag:10,vitc:7.4,fol:19},'1 medium (110g)',110),
+SF('s36','Garlic',{kcal:149,p:6.4,c:33.1,f:.5,fib:2.1,sug:1,iron:1.7,k:401,ca:181,mag:25,zn:1.2,vitc:31.2},'1 clove (3g)',3),
+SF('s37','Spinach',{kcal:23,p:2.9,c:3.6,f:.4,fib:2.2,sug:.4,iron:2.7,k:558,ca:99,mag:79,zn:.5,vita:469,vitc:28,vite:2,fol:194},'2 handfuls (60g)',60),
+SF('s38','Lettuce',{kcal:15,p:1.4,c:2.9,f:.2,fib:1.3,sug:.8,k:194,ca:36,vita:166,vitc:9.2,fol:38},'1 bowl (55g)',55),
+SF('s39','Mushrooms (white)',{kcal:22,p:3.1,c:3.3,f:.3,fib:1,sug:2,k:318,zn:.5,vitd:.2,fol:17},'1 handful (70g)',70),
+SF('s40','Courgette',{kcal:17,p:1.2,c:3.1,f:.3,fib:1,sug:2.5,k:261,mag:18,vita:10,vitc:17.9,fol:24},'½ courgette (98g)',98),
+SF('s41','Aubergine',{kcal:25,p:1,c:5.9,f:.2,fib:3,sug:3.5,k:229,mag:14,fol:22},'½ aubergine (230g)',230),
+SF('s42','Cauliflower',{kcal:25,p:1.9,c:5,f:.3,fib:2,sug:1.9,k:299,mag:15,vitc:48.2,fol:57},'1 serving (100g)',100),
+SF('s43','Green Beans',{kcal:31,p:1.8,c:7,f:.2,fib:2.7,sug:3.3,k:211,ca:37,mag:25,vita:35,vitc:12.2,fol:33},'1 serving (80g)',80),
+SF('s44','Peas (frozen)',{kcal:81,p:5.4,c:14.5,f:.4,fib:5.7,sug:5.7,iron:1.5,k:244,mag:33,zn:1.2,vita:38,vitc:40,fol:65},'1 serving (80g)',80),
+SF('s45','Sweetcorn (canned)',{kcal:86,p:3.3,c:19,f:1.4,fib:2,sug:6.3,k:270,mag:37,vitc:6.8,fol:42},'½ can (80g)',80),
+SF('s46','Cabbage',{kcal:25,p:1.3,c:5.8,f:.1,fib:2.5,sug:3.2,k:170,ca:40,vitc:36.6,fol:43},'1 serving (75g)',75),
+SF('s47','Kale',{kcal:35,p:2.9,c:4.4,f:1.5,fib:4.1,sug:.8,iron:1.6,k:348,ca:150,mag:33,vita:241,vitc:93,vite:1.5,fol:62},'2 handfuls (55g)',55),
+SF('s48','Celery',{kcal:14,p:.7,c:3,f:.2,fib:1.6,sug:1.3,sod:80,k:260,ca:40,vita:22,fol:36},'2 sticks (80g)',80),
+SF('s49','Spring Onion',{kcal:32,p:1.8,c:7.3,f:.2,fib:2.6,sug:2.3,iron:1.5,k:276,ca:72,vita:50,vitc:18.8,fol:64},'2 stems (30g)',30),
+// — fruit —
+SF('s50','Strawberries',{kcal:32,p:.7,c:7.7,f:.3,fib:2,sug:4.9,k:153,mag:13,vitc:58.8,fol:24},'1 handful (100g)',100),
+SF('s51','Blueberries',{kcal:57,p:.7,c:14.5,f:.3,fib:2.4,sug:10,k:77,vitc:9.7,vite:.6},'1 handful (75g)',75),
+SF('s52','Raspberries',{kcal:52,p:1.2,c:11.9,f:.7,fib:6.5,sug:4.4,k:151,mag:22,vitc:26.2,fol:21},'1 handful (60g)',60),
+SF('s53','Grapes',{kcal:69,p:.7,c:18.1,f:.2,fib:.9,sug:15.5,k:191,vitc:3.2},'1 handful (90g)',90),
+SF('s54','Orange',{kcal:47,p:.9,c:11.8,f:.1,fib:2.4,sug:9.4,k:181,ca:40,vitc:53.2,fol:30},'1 medium (131g)',131),
+SF('s55','Pineapple',{kcal:50,p:.5,c:13.1,f:.1,fib:1.4,sug:9.9,k:109,mag:12,vitc:47.8,fol:18},'1 slice (84g)',84),
+SF('s56','Mango',{kcal:60,p:.8,c:15,f:.4,fib:1.6,sug:13.7,k:168,vita:54,vitc:36.4,vite:.9,fol:43},'½ mango (168g)',168),
+SF('s57','Kiwi',{kcal:61,p:1.1,c:14.7,f:.5,fib:3,sug:9,k:312,ca:34,vitc:92.7,vite:1.5,fol:25},'1 kiwi (69g)',69),
+SF('s58','Pear',{kcal:57,p:.4,c:15.2,f:.1,fib:3.1,sug:9.8,k:116,vitc:4.3},'1 medium (178g)',178),
+SF('s59','Watermelon',{kcal:30,p:.6,c:7.6,f:.2,fib:.4,sug:6.2,k:112,vita:28,vitc:8.1},'1 wedge (280g)',280),
+SF('s60','Peach',{kcal:39,p:.9,c:9.5,f:.3,fib:1.5,sug:8.4,k:190,vita:16,vitc:6.6},'1 medium (150g)',150),
+SF('s61','Lemon',{kcal:29,p:1.1,c:9.3,f:.3,fib:2.8,sug:2.5,k:138,ca:26,vitc:53},'1 lemon (58g)',58),
+// — proteins & legumes —
+SF('s62','Chicken Thigh (cooked)',{kcal:179,p:24.8,c:0,f:8.2,satf:2.3,iron:1.2,k:230,mag:23,zn:2.4,b12:.6},'1 thigh (85g)',85),
+SF('s63','Turkey Breast (cooked)',{kcal:147,p:30.1,c:0,f:2.1,satf:.6,k:249,mag:32,zn:1.7,b12:.4},'1 serving (100g)',100),
+SF('s64','Pork Loin (cooked)',{kcal:180,p:27.3,c:0,f:7.1,satf:2.5,iron:.9,k:352,mag:26,zn:2.2,b12:.6},'1 serving (120g)',120),
+SF('s65','Cod (cooked)',{kcal:105,p:22.8,c:0,f:.9,satf:.2,sod:78,k:244,mag:35,vitd:1,b12:1},'1 fillet (140g)',140),
+SF('s66','Prawns (cooked)',{kcal:99,p:24,c:.2,f:.3,satf:.1,sod:224,k:259,ca:70,mag:35,zn:1.6,b12:1.5},'1 serving (85g)',85),
+SF('s67','Tofu (firm)',{kcal:118,p:12,c:1.5,f:7,satf:1,iron:2.7,k:150,ca:350,mag:37,zn:1.1,fol:19},'½ block (150g)',150),
+SF('s68','Chickpeas (cooked)',{kcal:164,p:8.9,c:27.4,f:2.6,satf:.3,fib:7.6,sug:4.8,iron:2.9,k:291,ca:49,mag:48,zn:1.5,fol:172},'½ can (120g)',120),
+SF('s69','Lentils (cooked)',{kcal:116,p:9,c:20.1,f:.4,satf:.1,fib:7.9,sug:1.8,iron:3.3,k:369,mag:36,zn:1.3,fol:181},'1 serving (125g)',125),
+SF('s70','Black Beans (cooked)',{kcal:132,p:8.9,c:23.7,f:.5,fib:8.7,iron:2.1,k:355,mag:70,zn:1.1,fol:149},'½ can (120g)',120),
+SF('s71','Kidney Beans (cooked)',{kcal:127,p:8.7,c:22.8,f:.5,fib:6.4,sug:.3,iron:2.9,k:403,mag:45,zn:1,fol:130},'½ can (120g)',120),
+SF('s72','Baked Beans',{kcal:79,p:4.7,c:11.4,f:.2,fib:3.7,sug:4.4,sod:240,iron:1.4,k:300,mag:30,fol:22},'½ can (207g)',207),
+// — grains & dairy —
+SF('s73','Quinoa (cooked)',{kcal:120,p:4.4,c:21.3,f:1.9,satf:.2,fib:2.8,sug:.9,iron:1.5,k:172,mag:64,zn:1.1,fol:42},'1 serving (150g)',150),
+SF('s74','Couscous (cooked)',{kcal:112,p:3.8,c:23.2,f:.2,fib:1.4,k:58,mag:8,zn:.3,fol:15},'1 serving (150g)',150),
+SF('s75','Egg Noodles (cooked)',{kcal:138,p:4.5,c:25.2,f:2.1,satf:.4,fib:1.2,iron:1.5,mag:21,zn:.6,fol:11},'1 nest (150g)',150),
+SF('s76','Cottage Cheese',{kcal:98,p:11.1,c:3.4,f:4.3,satf:1.7,sug:2.7,sod:364,k:104,ca:83,zn:.4,b12:.4},'½ pot (150g)',150),
+SF('s77','Skimmed Milk',{kcal:34,p:3.4,c:5,f:.1,satf:.1,sug:5,k:156,ca:122,mag:11,b12:.5},'1 glass (250ml)',250),
+SF('s78','Greek Yogurt 0%',{kcal:59,p:10.3,c:3.6,f:.4,satf:.1,sug:3.2,k:141,ca:110,mag:11,zn:.5,b12:.75},'1 pot (170g)',170),
+SF('s79','Mozzarella',{kcal:280,p:18.1,c:2.5,f:21,satf:13,sod:500,k:76,ca:400,zn:2.5,vita:180,b12:.9},'½ ball (62g)',62),
+SF('s80','Feta',{kcal:264,p:14.2,c:4.1,f:21.3,satf:14.9,sod:917,k:62,ca:493,mag:19,zn:2.9,vita:125,b12:1.7},'⅓ block (65g)',65),
+// — nuts, seeds & extras —
+SF('s81','Walnuts',{kcal:654,p:15.2,c:13.7,f:65.2,satf:6.1,fib:6.7,sug:2.6,iron:2.9,k:441,ca:98,mag:158,zn:3.1,vite:.7,fol:98},'1 handful (28g)',28),
+SF('s82','Cashews',{kcal:553,p:18.2,c:30.2,f:43.8,satf:7.8,fib:3.3,sug:5.9,iron:6.7,k:660,mag:292,zn:5.8,fol:25},'1 handful (28g)',28),
+SF('s83','Chia Seeds',{kcal:486,p:16.5,c:42.1,f:30.7,satf:3.3,fib:34.4,iron:7.7,k:407,ca:631,mag:335,zn:4.6,fol:49},'1 tbsp (12g)',12),
+SF('s84','Hummus',{kcal:166,p:7.9,c:14.3,f:9.6,satf:1.4,fib:6,sod:379,iron:2.4,k:228,mag:71,zn:1.8,fol:83},'2 tbsp (50g)',50),
+SF('s85','Dark Chocolate 70%',{kcal:598,p:7.8,c:45.9,f:42.6,satf:24.5,fib:10.9,sug:24,iron:11.9,k:715,mag:228,zn:3.3,caff:80},'2 squares (20g)',20),
 ];
 // notable vitamin/mineral values for staples (per 100 g; vita/vitd/b12/fol
 // in µg) — patched onto the seed definitions above to keep those lines sane
@@ -1035,8 +1126,10 @@ function weekStripEl(){
     const star=starDay(ds),logged=entriesFor(ds).length>0;
     const wd=new Date(ds+'T12:00').toLocaleDateString(undefined,{weekday:'narrow'});
     const mark=star?h('i',{},'⭐'):logged?h('span',{class:'dot2'}):h('i',{style:'opacity:.18'},'·');
+    // tap = full nutrition summary for that day (macro split + micro table);
+    // the sheet's own button jumps into the Diary for editing
     strip.append(h('button',{class:'wd'+(i===0?' today':'')+(star?' star':''),
-      onclick:()=>{S.date=ds;switchTab('diary');}},
+      onclick:()=>daySummarySheet(ds)},
       h('span',{},wd),mark));
   }
   return strip;
@@ -1109,6 +1202,10 @@ function insightLines(){
     out.push(['🧂','Sodium is averaging <b>'+kc(na.avg)+' mg/day</b> — above the '+kc(microRDA('sod'))+' mg guideline.']);
   const cf=avgOver(lastNDays(7),'caff');
   if(cf&&cf.avg>microRDA('caff'))out.push(['☕','Caffeine is averaging <b>'+kc(cf.avg)+' mg/day</b> — above the '+kc(microRDA('caff'))+' mg guideline.']);
+  // additive exposure: sustained high-risk items are worth a nudge
+  let hiAdd=0;
+  for(const d of lastNDays(7))hiAdd+=dayAdditiveStats(d).hi;
+  if(hiAdd>=3)out.push(['⚗️','<b>'+hiAdd+' items</b> with high-risk additives this week — watch for the red count badge when picking products.']);
   const q0=qualityAvg(lastNDays(7)),q1=qualityAvg(lastNDays(7,7));
   if(q0!=null){
     let txt='Food quality this week averages <b>'+gradeLetter(q0)+'</b>';
@@ -1130,30 +1227,36 @@ function insightsCard(){
   return card;
 }
 
-function microCardEl(){
-  const t=dayTotals(todayStr());
-  const head=h('h3',{class:'serif'},'Micronutrients today',
-    h('button',{style:'float:right;font-size:13px;font-weight:700;color:var(--acc)',
-      onclick:microTargetsSheet},'Targets'));
-  const card=h('div',{class:'card'},head);
+/* grouped micro-RDA bar rows for a totals vector — shared by the dashboard
+   card and the any-day summary sheet */
+function microRowsFrag(t){
+  const frag=document.createDocumentFragment();
   let group='';
   for(const[key,label,unit,,,isLimit,grp]of MICROS){
     if(grp!==group){
       group=grp;
-      card.append(h('div',{class:'lbl',style:'margin-top:10px'},grp));
+      frag.append(h('div',{class:'lbl',style:'margin-top:10px'},grp));
     }
     const target=microRDA(key),v=t[key]||0;
     const pct=target>0?clamp(v/target,0,1):0;
     const over=isLimit&&v>target;
     const fill=h('div',{class:'mfill'+(over?' warn':''),style:'width:'+Math.round(pct*100)+'%'});
-    card.append(h('div',{class:'microrow'},
+    frag.append(h('div',{class:'microrow'},
       h('span',{class:'ml'},label),
       h('div',{class:'mbar'},fill),
       h('span',{class:'mv num'+(over?' streakfire':'')},
         g1(v)+' ',h('small',{},(isLimit?'limit ':'/ ')+g1(target)+unit))));
   }
-  card.append(h('p',{class:'tiny dim',style:'margin-top:8px'},
-    'From logged foods only — many products don’t declare micronutrients, so treat these as a floor, not an exact count.'));
+  return frag;
+}
+const MICRO_FLOOR_NOTE='From logged foods only — many products don’t declare micronutrients, so treat these as a floor, not an exact count.';
+function microCardEl(){
+  const head=h('h3',{class:'serif'},'Micronutrients today',
+    h('button',{style:'float:right;font-size:13px;font-weight:700;color:var(--acc)',
+      onclick:microTargetsSheet},'Targets'));
+  const card=h('div',{class:'card'},head);
+  card.append(microRowsFrag(dayTotals(todayStr())));
+  card.append(h('p',{class:'tiny dim',style:'margin-top:8px'},MICRO_FLOOR_NOTE));
   return card;
 }
 // custom per-micro daily targets (blank = sex-based default)
@@ -1193,7 +1296,91 @@ function qualityCardEl(){
     h('div',{class:'grow'},
       h('p',{class:'small'},'Today’s kcal-weighted Nutri-Score.'),
       h('p',{class:'tiny dim'},wk!=null?'7-day average: '+gradeLetter(wk):'Official grades from Open Food Facts; others estimated.'))));
+  const st=dayAdditiveStats(todayStr());
+  if(st.hi||st.mod)card.append(h('p',{class:'tiny',style:'margin-top:8px;color:'+(st.hi?ADD_COLS[3]:ADD_COLS[2])},
+    '⚗️ '+(st.hi?st.hi+' item'+(st.hi===1?'':'s')+' with high-risk additives today':
+      st.mod+' item'+(st.mod===1?'':'s')+' with moderate-risk additives today')));
   return card;
+}
+
+/* ---------------- any-day nutrition summary (sheet) ----------------
+   Full read of a single day — macros vs that day's targets, kcal split,
+   the complete micro table and quality/additive verdicts — reachable from
+   the dashboard week strip and the Diary, so past days are never opaque. */
+function splitDonut(t){
+  const cals=[t.p*4,t.c*4,t.f*9];
+  const tot=cals[0]+cals[1]+cals[2];
+  if(tot<=0)return null;
+  const svg=sv('svg',{viewBox:'0 0 100 100'});
+  const cols=['var(--mp)','var(--mc)','var(--mf)'];
+  let start=0;
+  cals.forEach((v,i)=>{
+    const seg=v/tot*100;
+    if(seg<=0)return;
+    svg.append(sv('circle',{cx:50,cy:50,r:38,fill:'none',stroke:cols[i],'stroke-width':15,
+      pathLength:100,'stroke-dasharray':seg+' '+(100-seg),'stroke-dashoffset':String(-start)}));
+    start+=seg;
+  });
+  return {svg,cals,tot};
+}
+function daySummarySheet(ds){
+  const isToday=ds===todayStr();
+  const ens=entriesFor(ds);
+  const body=h('div',{});
+  if(!ens.length){
+    body.append(h('div',{class:'empty'},
+      h('div',{class:'serif'},'Nothing logged'),
+      h('p',{},'No entries on this day — open the diary to add some retroactively.')));
+  }else{
+    const t=dayTotals(ds),tg=targetFor(ds);
+    // macro tiles vs that day's own targets
+    const tile=(v,target,label,unit)=>h('div',{class:'ds num'},
+      h('b',{},unit==='g'?g1(v):kc(v)),h('span',{},label),
+      h('u',{},'of '+(unit==='g'?g1(target)+'g':kc(target))));
+    body.append(h('div',{class:'daysum'},
+      tile(t.kcal,tg.kcal,'kcal',''),
+      tile(t.p,tg.p,'protein','g'),
+      tile(dispC(t),tg.c,carbLbl().toLowerCase(),'g'),
+      tile(t.f,tg.f,'fat','g')));
+    // kcal split donut + legend
+    const sp=splitDonut(t);
+    if(sp){
+      const leg=h('div',{class:'splitleg num'});
+      [['Protein','var(--mp)',t.p],[carbLbl(),'var(--mc)',t.c],['Fat','var(--mf)',t.f]].forEach(([lb,col,gr],i)=>{
+        leg.append(h('div',{class:'row'},
+          h('span',{class:'rdot',style:'background:'+col}),
+          h('span',{class:'dim'},lb),
+          h('b',{},g1(gr)+' g'),
+          h('span',{class:'dim'},Math.round(sp.cals[i]/sp.tot*100)+'%')));
+      });
+      body.append(h('label',{class:'lbl'},'Calorie split'),
+        h('div',{class:'splitwrap'},sp.svg,leg));
+    }
+    // quality + additives verdicts
+    const q=qualityAvg([ds]),st=dayAdditiveStats(ds);
+    const qrow=h('div',{class:'row',style:'gap:12px;margin-top:4px'});
+    if(q!=null){
+      const letter=gradeLetter(q);
+      qrow.append(h('span',{class:'gr big gr-'+letter.toLowerCase()},letter));
+    }
+    const verdicts=h('div',{class:'grow small'});
+    if(q!=null)verdicts.append(h('p',{},'Kcal-weighted Nutri-Score for the day.'));
+    verdicts.append(h('p',{class:'tiny',style:'margin-top:3px;color:'+
+      (st.hi?ADD_COLS[3]:st.mod?ADD_COLS[2]:'var(--dim)')},
+      st.hi?'⚗️ '+st.hi+' item'+(st.hi===1?'':'s')+' with high-risk additives'
+      :st.mod?'⚗️ '+st.mod+' item'+(st.mod===1?'':'s')+' with moderate-risk additives'
+      :st.known?'✓ No moderate- or high-risk additives logged'
+      :'No additive data for this day’s foods.'));
+    body.append(h('label',{class:'lbl'},'Food quality'),qrow);
+    qrow.append(verdicts);
+    // full micronutrient table for the day
+    body.append(microRowsFrag(t),
+      h('p',{class:'tiny dim',style:'margin-top:8px'},MICRO_FLOOR_NOTE));
+  }
+  body.append(h('button',{class:'btn primary mt12',onclick:()=>{
+    close();S.date=ds;switchTab('diary');
+  }},isToday?'Open today’s diary':'Open in Diary'));
+  const close=sheet((starDay(ds)?'⭐ ':'')+(isToday?'Today':fmtDayLong(ds)),body);
 }
 
 /* ---------------- copy a previous day's entries ---------------- */
@@ -1224,24 +1411,42 @@ function copyDaySheet(target){
     if(!any)list.append(h('div',{class:'mealempty'},h('i',{},'Nothing logged on '+fmtDay(src))));
     count();
   }
+  /* Copying is idempotent: anything already on the target day with the same
+     food+meal+amount (auto-logged daily staples, or a copy pressed twice)
+     is skipped, not doubled. Multiset counting keeps genuine duplicates
+     WITHIN the source day (e.g. two identical snacks) copyable. */
+  const ekey=e=>e.foodId+'|'+e.meal+'|'+e.amt+'|'+e.unit;
+  function copyPlan(){
+    const have=new Map();
+    for(const e of entriesFor(target))have.set(ekey(e),(have.get(ekey(e))||0)+1);
+    const copy=[];let skip=0;
+    for(const[mk]of MEALS){
+      if(!picks[mk])continue;
+      for(const en of entriesFor(src).filter(e=>e.meal===mk)){
+        const k=ekey(en),n=have.get(k)||0;
+        if(n>0){have.set(k,n-1);skip++;}
+        else copy.push(en);
+      }
+    }
+    return {copy,skip};
+  }
   function count(){
-    let n=0;
-    for(const[mk]of MEALS)if(picks[mk])n+=entriesFor(src).filter(e=>e.meal===mk).length;
-    copyBtn.textContent=n?'Copy '+n+' item'+(n===1?'':'s')+' to '+(target===todayStr()?'today':fmtDay(target)):'Nothing selected';
+    const {copy,skip}=copyPlan();
+    const n=copy.length;
+    copyBtn.textContent=n
+      ?'Copy '+n+' item'+(n===1?'':'s')+' to '+(target===todayStr()?'today':fmtDay(target))+
+        (skip?' ('+skip+' already there)':'')
+      :skip?'All '+skip+' already there — nothing to copy':'Nothing selected';
     copyBtn.disabled=!n;
     copyBtn.style.opacity=n?'':'0.5';
   }
   copyBtn.addEventListener('click',async()=>{
-    let n=0;
-    for(const[mk]of MEALS){
-      if(!picks[mk])continue;
-      for(const en of entriesFor(src).filter(e=>e.meal===mk)){
-        await logEntry({date:target,meal:mk,foodId:en.foodId,amt:en.amt,unit:en.unit});
-        n++;
-      }
-    }
+    const {copy,skip}=copyPlan();
+    for(const en of copy)
+      await logEntry({date:target,meal:en.meal,foodId:en.foodId,amt:en.amt,unit:en.unit});
     haptic();close();renderTab(S.tab);
-    toast('Copied '+n+' item'+(n===1?'':'s')+' ✓',{pr:true});
+    toast('Copied '+copy.length+' item'+(copy.length===1?'':'s')+
+      (skip?' · '+skip+' skipped (already there)':'')+' ✓',{pr:true});
   });
   const close=sheet('Copy a day',h('div',{},
     labeled('Copy from',srcIn),list,copyBtn));
@@ -1354,7 +1559,7 @@ function editEntrySheet(en){
    classic cgi/search.pl JSON endpoint (v2 has no free-text parameter).
    EVERY product that comes back is cached into the foods store keyed
    'off:<barcode>', so repeat scans/searches work fully offline. */
-const OFF_FIELDS='code,product_name,brands,nutriments,serving_size,serving_quantity,image_small_url,nutriscore_grade,nova_group';
+const OFF_FIELDS='code,product_name,brands,nutriments,serving_size,serving_quantity,image_small_url,nutriscore_grade,nova_group,additives_tags';
 function netSet(off){S.offline=off;document.body.classList.toggle('off',off);}
 async function offFetch(url){
   const ac=new AbortController();
@@ -1420,9 +1625,15 @@ function offToFood(prod){
   if(p100&&!servG){servG=100;servLabel=servLabel||'100 g';}
   if(p100&&!servLabel)servLabel=servG+' g';
   const ns=/^[a-e]$/.test(prod.nutriscore_grade||'')?prod.nutriscore_grade:null;
+  // additives: OFF tags like "en:e330" → ['e330',…]; [] = analysed & none
+  // found, null = field absent (older cached records show "no data")
+  const adds=Array.isArray(prod.additives_tags)
+    ?[...new Set(prod.additives_tags.map(t=>String(t).replace(/^[a-z]{2}:/,'').toLowerCase())
+        .filter(t=>/^e\d/.test(t)))]
+    :null;
   const f={id:'off:'+prod.code,src:'off',barcode:String(prod.code),name,
     brand:(prod.brands||'').split(',')[0].trim(),per,servLabel,servG:servG||null,
-    p100,thumb:prod.image_small_url||null,ns,nova:+prod.nova_group||null,
+    p100,thumb:prod.image_small_url||null,ns,nova:+prod.nova_group||null,adds,
     ts:Date.now(),used:0,lastUsed:0,hidden:0,edited:0};
   return derivePer(f);
 }
@@ -1470,6 +1681,100 @@ function qualityAvg(days){
     ws+=GRADE_VAL[gr.g]*wt;w+=wt;
   }
   return w?ws/w:null;
+}
+
+/* ---------- additive risk scoring (Yuka-style) ----------
+   OFF products carry additives_tags; each E-number is classed 0 no known
+   risk · 1 limited · 2 moderate · 3 high, following the EFSA-informed
+   classification Yuka popularised (azo dyes, nitrites, BHA/BHT, artificial
+   sweeteners = high; sulphites, phosphates, MSG, carrageenan = moderate;
+   most emulsifiers/gums = limited; vitamins, citrates, pectin = none).
+   Unlisted codes default to "limited" — additive, but no strong evidence. */
+const ADD_DB={};
+{const D=(risk,defs)=>{for(const[codes,name]of defs)for(const c of codes.split(' '))ADD_DB[c]={name,risk};};
+D(3,[['e102','Tartrazine'],['e104','Quinoline Yellow'],['e110','Sunset Yellow'],
+  ['e122','Azorubine'],['e124','Ponceau 4R'],['e129','Allura Red'],
+  ['e127','Erythrosine'],['e155','Brown HT'],['e171','Titanium dioxide'],
+  ['e214 e215 e218 e219','Parabens'],['e249 e250','Nitrites'],['e251 e252','Nitrates'],
+  ['e310','Propyl gallate'],['e319','TBHQ'],['e320','BHA'],['e321','BHT'],
+  ['e950','Acesulfame K'],['e951','Aspartame'],['e952','Cyclamates'],
+  ['e954','Saccharin'],['e955','Sucralose'],['e962','Aspartame-acesulfame salt']]);
+D(2,[['e120','Carmine (cochineal)'],['e131','Patent Blue V'],['e142','Green S'],
+  ['e150c e150d','Ammonia caramel colour'],['e160b','Annatto'],['e173','Aluminium'],
+  ['e210 e211 e212 e213','Benzoates'],['e220 e221 e222 e223 e224 e226 e227 e228','Sulphites'],
+  ['e242','Dimethyl dicarbonate'],['e338 e339 e340 e341 e343','Phosphates'],
+  ['e385','Calcium disodium EDTA'],['e407 e407a','Carrageenan'],
+  ['e433 e435 e436','Polysorbates'],['e450 e451 e452','Di-/tri-/polyphosphates'],
+  ['e466','Carboxymethylcellulose'],['e520 e521 e522 e523','Aluminium sulphates'],
+  ['e541','Sodium aluminium phosphate'],['e553b','Talc'],
+  ['e554 e555 e556 e559','Aluminium silicates'],
+  ['e620 e621 e622 e623 e624 e625','Glutamates (MSG)'],
+  ['e627 e631 e635','Flavour nucleotides'],['e961','Neotame'],['e1520','Propylene glycol']]);
+D(1,[['e132 e133','Synthetic blue dyes'],['e141','Copper chlorophyllins'],
+  ['e150b','Caustic sulphite caramel'],['e153','Vegetable carbon'],['e172','Iron oxides'],
+  ['e200 e202 e203','Sorbates'],['e234','Nisin'],['e235','Natamycin'],
+  ['e280 e281 e282 e283','Propionates'],['e315 e316','Erythorbates'],
+  ['e405','Propylene glycol alginate'],['e413','Tragacanth'],['e418','Gellan gum'],
+  ['e420 e421 e953 e965 e966 e967 e968','Polyols (sweeteners)'],['e425','Konjac'],
+  ['e460 e461 e463 e464 e465','Celluloses'],['e471','Mono-/diglycerides'],
+  ['e472a e472b e472c e472d e472e e472f','Fatty-acid esters'],
+  ['e473 e474','Sucrose esters'],['e475 e476 e477','Polyglycerol esters'],
+  ['e481 e482 e483','Lactylates'],['e491 e492 e493 e494 e495','Sorbitan esters'],
+  ['e535 e536 e538','Ferrocyanides'],['e551 e552 e553a','Silica/silicates'],
+  ['e900','Dimethylpolysiloxane'],['e904','Shellac'],['e959','Neohesperidine DC'],
+  ['e999','Quillaia extract'],['e1201 e1202','Polyvinylpyrrolidones'],
+  ['e1410 e1412 e1414 e1420 e1422 e1440 e1442 e1450 e1451','Modified starches'],
+  ['e1518','Triacetin']]);
+D(0,[['e100','Curcumin'],['e101','Riboflavin (B2)'],['e140','Chlorophylls'],
+  ['e150a','Plain caramel'],['e160a','Carotenes'],['e160c','Paprika extract'],
+  ['e160d','Lycopene'],['e161b','Lutein'],['e162','Beetroot red'],['e163','Anthocyanins'],
+  ['e170','Calcium carbonate'],['e260 e261 e262 e263','Acetates'],['e270','Lactic acid'],
+  ['e290','Carbon dioxide'],['e296','Malic acid'],['e300 e301 e302 e304','Vitamin C (ascorbates)'],
+  ['e306 e307 e308 e309','Vitamin E (tocopherols)'],['e322','Lecithins'],
+  ['e325 e326 e327','Lactates'],['e330 e331 e332 e333','Citric acid & citrates'],
+  ['e334 e335 e336 e337','Tartrates'],['e350 e351 e352','Malates'],
+  ['e392','Rosemary extract'],['e400 e401 e402 e404','Alginates'],['e406','Agar'],
+  ['e410','Locust bean gum'],['e412','Guar gum'],['e414','Acacia gum'],
+  ['e415','Xanthan gum'],['e417','Tara gum'],['e422','Glycerol'],['e440','Pectins'],
+  ['e500 e501 e503 e504','Carbonates'],['e507 e508 e509 e511','Chlorides'],
+  ['e516','Calcium sulphate'],['e524 e525 e526 e527 e528','pH-adjusting alkalis'],
+  ['e570','Fatty acids'],['e574 e575','Gluconates'],
+  ['e901','Beeswax'],['e902','Candelilla wax'],['e903','Carnauba wax'],
+  ['e920','L-cysteine'],['e938 e939 e941 e948 e949','Packaging gases'],
+  ['e957','Thaumatin'],['e960','Steviol glycosides'],['e1200','Polydextrose']]);}
+const ADD_RISK_LBL=['no known risk','limited risk','moderate risk','high risk'];
+const ADD_COLS=['#2fd671','#f5b62e','#EF7E1A','#ff6b4a'];
+function addInfo(code){
+  code=String(code).toLowerCase();
+  let hit=ADD_DB[code];
+  if(!hit){const m=code.match(/^(e\d+[a-z]?)/);hit=m?ADD_DB[m[1]]:null;}      // e450i → e450
+  if(!hit){const m=code.match(/^(e\d+)/);hit=m?ADD_DB[m[1]]:null;}            // e160ai → e160
+  return {code:code.toUpperCase().replace(/([A-Z]+)$/,m=>m.toLowerCase()),
+    name:hit?hit.name:null,risk:hit?hit.risk:1};
+}
+// null = no additive data (pre-v2.2 cache, USDA, unscanned) — refreshes on next lookup
+function addScore(f){
+  if(!f||f.adds==null)return null;
+  const list=f.adds.map(addInfo).sort((a,b)=>b.risk-a.risk);
+  return {n:list.length,worst:list.length?list[0].risk:0,list};
+}
+function addBadge(f){
+  const sc=addScore(f);
+  if(!sc||!sc.n)return null;   // rows stay clean unless additives exist
+  return h('span',{class:'ab ab-'+sc.worst,
+    title:sc.n+' additive'+(sc.n===1?'':'s')+' · worst: '+ADD_RISK_LBL[sc.worst]},String(sc.n));
+}
+// per-day additive exposure: how many logged entries contain risky additives
+function dayAdditiveStats(ds){
+  const out={hi:0,mod:0,known:0};
+  for(const en of entriesFor(ds)){
+    const sc=addScore(S.foods.get(en.foodId));
+    if(!sc)continue;
+    out.known++;
+    if(sc.worst>=3)out.hi++;
+    else if(sc.worst===2)out.mod++;
+  }
+  return out;
 }
 
 /* ---------- USDA FoodData Central (backup search API) ----------
@@ -1593,7 +1898,7 @@ function foodRowBtn(f,tag,onclick){
   if(tag)subEl.prepend(h('span',{class:'src-tag '+tag[1],style:'margin-right:6px'},tag[0]));
   const kcalEl=h('div',{class:'fr-kcal num'},h('b',{},kc(per.kcal)),h('span',{},'kcal'));
   const mid=h('div',{class:'grow'},h('div',{class:'fr-name'},f.name),subEl);
-  return h('button',{class:'food-row',onclick},frThumb(f),mid,gradeBadge(f),kcalEl);
+  return h('button',{class:'food-row',onclick},frThumb(f),mid,gradeBadge(f),addBadge(f),kcalEl);
 }
 function renderAddHome(){
   const box=$('#add-results');
@@ -1625,11 +1930,11 @@ function renderAddHome(){
   for(const f of mine.slice(0,30))fcard.append(foodRowBtn(f,['MINE','mine'],()=>openLogSheet(f)));
   if(!mine.length)fcard.append(h('div',{class:'mealempty'},h('i',{},'Your own foods — works fully offline')));
   box.append(addSec('My Foods',null,'+ Create',()=>customFoodSheet()),fcard);
-  const lib=[...S.foods.values()].filter(f=>f.src==='seed'&&!f.hidden&&!f.lastUsed).slice(0,10);
+  const lib=[...S.foods.values()].filter(f=>f.src==='seed'&&!f.hidden&&!f.lastUsed).slice(0,12);
   if(lib.length){
     const lcard=h('div',{class:'listcard'});
     for(const f of lib)lcard.append(foodRowBtn(f,null,()=>openLogSheet(f)));
-    box.append(addSec('Staples','built-in library'),lcard);
+    box.append(addSec('Staples',SEED_FOODS.length+' built in — search finds them all'),lcard);
   }
 }
 function onSearchInput(q){
@@ -1724,7 +2029,58 @@ function openLogSheet(food,ctx,existing){
     preview.innerHTML='<div style="text-align:center"><div class="num" style="font-size:30px;font-weight:800;letter-spacing:-.5px">'+kc(m.kcal)+'<span class="dim" style="font-size:13px;font-weight:600"> kcal</span></div>'+
       '<div class="mch" style="font-size:13px;gap:12px;justify-content:center"><span class="p">P <b>'+g1(m.p)+'g</b></span><span class="c">C <b>'+g1(dispC(m))+'g</b></span><span class="f">F <b>'+g1(m.f)+'g</b></span></div>'+
       '<div class="tiny dim" style="margin-top:5px">Macro math: '+mm+' kcal'+(off15?' — label differs ⚠️':'')+'</div></div>';
+    renderNut(m);
     if(setInput)amtIn.value=String(Math.round(amt*100)/100);
+  }
+  /* full nutrient table for the CURRENT amount — micros per food at last
+     (values track the stepper live; % column = share of the daily target) */
+  const nutBox=h('div',{style:'display:none;margin-top:4px'});
+  const nutBtn=h('button',{class:'btn sm mt8',onclick:()=>{
+    const show=nutBox.style.display==='none';
+    nutBox.style.display=show?'':'none';
+    nutBtn.textContent=show?'Hide full nutrition ▴':'Full nutrition & micros ▾';
+  }},'Full nutrition & micros ▾');
+  function renderNut(m){
+    if(nutBox.style.display==='none'&&!nutBox.childElementCount)return; // lazy first fill
+    nutBox.innerHTML='';
+    const mk=(label,txt,ref,sub)=>h('div',{class:'nutrow'+(sub?' sub':'')},
+      h('span',{class:'nl'},label),h('span',{class:'nv num'},txt),h('span',{class:'nr num'},ref||''));
+    nutBox.append(
+      mk('Calories',kc(m.kcal)+' kcal'),
+      mk('Protein',g1(m.p)+' g'),
+      mk(carbLbl(),g1(dispC(m))+' g'),
+      mk('Sugars',g1(m.sug)+' g',null,true),
+      mk('Fibre',g1(m.fib)+' g',null,true),
+      mk('Fat',g1(m.f)+' g'),
+      mk('Saturated',g1(m.satf)+' g',null,true));
+    for(const[key,label,unit,,,isLimit]of MICROS){
+      const v=m[key]||0,ref=microRDA(key);
+      nutBox.append(mk(label,g1(v)+' '+unit,
+        ref>0?Math.round(v/ref*100)+'%'+(isLimit?' limit':' RDA'):''));
+    }
+    nutBox.append(h('p',{class:'tiny dim',style:'margin-top:6px'},
+      '0 usually means “not declared on the label”, not truly zero.'));
+  }
+  nutBtn.addEventListener('click',()=>{if(nutBox.style.display!=='none'&&!nutBox.childElementCount)upd(false);});
+  /* additive verdict for this food (Yuka-style risk classes) */
+  function addSection(){
+    const sc=addScore(food);
+    if(!sc)return food.src==='off'
+      ?h('p',{class:'tiny dim',style:'margin-top:10px'},
+        '⚗️ No additive data cached yet — search or scan this product once while online to fetch it.')
+      :null;
+    const box=h('div',{},h('label',{class:'lbl'},'Additives'));
+    if(!sc.n){
+      box.append(h('p',{class:'small',style:'color:'+ADD_COLS[0]},'✓ No additives detected'));
+    }else{
+      for(const a of sc.list)box.append(h('div',{class:'addrow'},
+        h('span',{class:'adot',style:'background:'+ADD_COLS[a.risk]}),
+        h('span',{class:'an'},a.code,a.name?h('small',{},a.name):null),
+        h('span',{class:'ar',style:a.risk>=2?'color:'+ADD_COLS[a.risk]:''},ADD_RISK_LBL[a.risk])));
+    }
+    if(food.nova===4)box.append(h('p',{class:'tiny dim',style:'margin-top:6px'},
+      'NOVA group 4 — classed as ultra-processed by Open Food Facts.'));
+    return box;
   }
   const step=d=>{const inc=unit==='g'?(d>0?10:-10):(d>0?.5:-.5);amt=Math.max(Math.round((amt+inc)*100)/100,0);upd(true);};
   const stepper=h('div',{class:'stepper mt8'},
@@ -1736,6 +2092,8 @@ function openLogSheet(food,ctx,existing){
   const subRow=h('div',{class:'row',style:'margin:0 2px 8px'});
   const gb=gradeBadge(food);
   if(gb)subRow.append(gb);
+  const ab=addBadge(food);
+  if(ab)subRow.append(ab);
   if(food.brand||food.servLabel)subRow.append(h('p',{class:'small dim grow'},(food.brand?food.brand+' · ':'')+(food.servLabel||'')));
   if(subRow.children.length)body.append(subRow);
   body.append(preview);
@@ -1752,6 +2110,9 @@ function openLogSheet(food,ctx,existing){
   function btnLbl(){logBtn.textContent=(existing?'Save changes':'Log to '+MEAL_NAME[meal])+(date!==todayStr()?' · '+fmtDay(date):'');}
   body.append(labeled('Meal',seg(MEALS,meal,v=>{meal=v;btnLbl();})));
   body.append(logBtn);
+  body.append(nutBtn,nutBox);
+  const addSec_=addSection();
+  if(addSec_)body.append(addSec_);
   if(existing){
     const swap=h('button',{class:'btn sm mt8',onclick:()=>{
       pickFoodSheet(nf=>{
@@ -1963,18 +2324,54 @@ function parseIngredient(line){
   }
   return {amt:1,unit:'serv',name:line};
 }
+/* ingredient matching, v2.2 — exact stemmed tokens + coverage scoring.
+   The old substring scorer let "chicken breast" resolve to "Breaded Chicken
+   Fillets" (any partial hit counted). Now: prep words are ignored, tokens
+   are singularised, MOST of the query must match (qCov ≥ .55, so "breast"
+   can't silently miss), and candidates whose names are mostly unexplained
+   extra words rank below plain whole foods. No match → honest "pick one". */
+const MATCH_STOP=new Set(['fresh','raw','ripe','large','medium','small','big',
+  'chopped','diced','sliced','grated','minced','shredded','crushed','finely',
+  'roughly','thinly','peeled','deseeded','trimmed','optional','taste','pinch',
+  'handful','extra','little','plain','boneless','skinless','lean','cooked',
+  'boiled','baked','grilled','roasted','steamed','dry','frozen','tinned',
+  'canned','drained','tin','tins','jar','pack','bag','cup','cups','tbsp','tsp',
+  'tablespoon','tablespoons','teaspoon','teaspoons','clove','cloves','stick',
+  'sticks','piece','pieces','the','and','with','into','about','some','few']);
+const TOK_ALIAS={yoghurt:'yogurt',zucchini:'courgette',eggplant:'aubergine',
+  shrimp:'prawn',garbanzo:'chickpea',capsicum:'pepper',scallion:'spring',
+  cornflour:'corn',porridge:'oat'};
+const stemTok=t=>{
+  t=t.replace(/(sses|shes|ches|xes)$/,m=>m.slice(0,-2))
+     .replace(/ies$/,'y').replace(/oes$/,'o').replace(/([^su])s$/,'$1');
+  return TOK_ALIAS[t]||t;
+};
+const matchToks=s=>String(s).toLowerCase().split(/[^a-zà-ÿ]+/)
+  .filter(t=>t.length>2&&!MATCH_STOP.has(t)).map(stemTok);
 function matchFood(name){
-  const toks=name.toLowerCase().split(/[^a-zà-ÿ]+/).filter(t=>t.length>2);
+  const toks=matchToks(name);
   if(!toks.length)return null;
+  const qlen=toks.reduce((a,t)=>a+t.length,0),qset=new Set(toks);
   let best=null,bs=0;
   for(const f of S.foods.values()){
     if(f.hidden)continue;
-    const fn=(f.name+' '+(f.brand||'')).toLowerCase();
-    let s=0;
-    for(const t of toks)if(fn.includes(t))s+=t.length;
-    if(s>bs||(s===bs&&best&&(f.used||0)>(best.used||0))){bs=s;best=f;}
+    const ft=matchToks(f.name+' '+(f.brand||''));
+    if(!ft.length)continue;
+    const fset=new Set(ft);
+    let match=0;
+    for(const t of qset)if(fset.has(t))match+=t.length;
+    if(!match)continue;
+    const qCov=match/qlen;                 // how much of the QUERY is matched
+    if(qCov<.55)continue;
+    const flen=ft.reduce((a,t)=>a+t.length,0);
+    let fmatch=0;
+    for(const t of fset)if(qset.has(t))fmatch+=t.length;
+    let s=qCov*.7+(fmatch/flen)*.3;        // penalise mostly-unexplained names
+    if(f.src==='seed'||f.src==='custom')s+=.03;  // whole/own foods win ties
+    s+=Math.min(f.used||0,20)*.002;              // gentle familiarity nudge
+    if(s>bs){bs=s;best=f;}
   }
-  return bs>=3?best:null;
+  return best;
 }
 function importRecipeSheet(){
   const ta=h('textarea',{class:'in',rows:6,
@@ -2189,8 +2586,9 @@ function renderDiary(){
   const dn=(S.notes[ds]||{}).day;
   pg.append(h('button',{class:dn?'note-line daynote':'btn sm mb8',
     onclick:()=>noteSheet(ds,'day')},dn?'✎ '+dn:'✎ Add a note to this day'));
-  pg.append(h('button',{class:'btn sm mb8',onclick:()=>copyDaySheet(ds)},
-    '⧉ Copy another day’s entries here'));
+  pg.append(h('div',{class:'grid2 mb8'},
+    h('button',{class:'btn sm',onclick:()=>daySummarySheet(ds)},'📊 Full breakdown'),
+    h('button',{class:'btn sm',onclick:()=>copyDaySheet(ds)},'⧉ Copy a day here')));
   pg.append(mealGroupsEl(ds));
 }
 /* one note per day + per meal slot, stored in kv 'notes':
@@ -2764,7 +3162,7 @@ function downloadExport(){
   toast('Backup downloaded');
 }
 const FOOD_DEF={src:'custom',barcode:null,brand:'',per:null,servLabel:'1 serving',
-  servG:null,p100:null,thumb:null,ns:null,nova:null,ts:0,used:0,lastUsed:0,hidden:0,edited:0};
+  servG:null,p100:null,thumb:null,ns:null,nova:null,adds:null,ts:0,used:0,lastUsed:0,hidden:0,edited:0};
 async function applyImport(data){
   if(!data||data.app!=='macrolog'||!Array.isArray(data.entries))
     throw new Error('Not a MacroLog backup file');
@@ -2787,9 +3185,19 @@ async function applyImport(data){
 async function applyAutoLog(){
   const today=todayStr();
   if(S.set.autoDate===today||!(S.set.autoLog||[]).length)return;
+  // skip rules whose exact entry already exists today — e.g. the user
+  // copied yesterday (which contained the auto-logged items) before the
+  // day's auto-run fired; mirrors the dedupe in copyDaySheet
+  const have=new Map();
+  for(const e of entriesFor(today)){
+    const k=e.foodId+'|'+e.meal+'|'+e.amt+'|'+e.unit;
+    have.set(k,(have.get(k)||0)+1);
+  }
   let n=0;
   for(const r of S.set.autoLog){
     if(!S.foods.get(r.foodId))continue;
+    const k=r.foodId+'|'+r.meal+'|'+r.amt+'|'+r.unit;
+    if((have.get(k)||0)>0){have.set(k,have.get(k)-1);continue;}
     await logEntry({date:today,meal:r.meal,foodId:r.foodId,amt:r.amt,unit:r.unit});
     n++;
   }
@@ -2918,7 +3326,7 @@ async function loadAll(){
       await dbPut('foods',c);
     }else if(!ex.edited){
       const upd={...ex,name:sf.name,per:sf.per,p100:sf.p100,
-        servLabel:sf.servLabel,servG:sf.servG};
+        servLabel:sf.servLabel,servG:sf.servG,adds:sf.adds};
       if(JSON.stringify(upd)!==JSON.stringify(ex)){
         S.foods.set(sf.id,upd);
         await dbPut('foods',upd);
@@ -3000,7 +3408,8 @@ async function boot(){
   // debug/test handle (same pattern as IronLog's __il)
   window.__ml={S,buildExportData,applyImport,loadAll,renderTab,switchTab,
     dayTotals,entryMacros,offToFood,streaks,reindex,dbPut,dbClear,
-    suggestTargets,mifflin};
+    suggestTargets,mifflin,matchFood,addScore,addInfo,dayAdditiveStats,
+    daySummarySheet,applyAutoLog,logEntry};
   if(!S.set.onboard)obStart();
   else switchTab('today');
 }
