@@ -14,9 +14,10 @@ self.addEventListener('activate',e=>e.waitUntil(self.clients.claim()));
 self.addEventListener('fetch',e=>{
   if(e.request.method!=='GET')return;
   const url=new URL(e.request.url);
-  // Let the app handle OFF API availability itself (it has its own IDB cache
-  // and offline UI) — stale API responses from a SW cache would mask that.
-  if(url.hostname.endsWith('openfoodfacts.org'))return;
+  // Let the app handle food-API availability itself (it has its own IDB
+  // cache and offline UI) — stale API responses from a SW cache would mask
+  // that. Applies to Open Food Facts AND USDA FoodData Central.
+  if(url.hostname.endsWith('openfoodfacts.org')||url.hostname==='api.nal.usda.gov')return;
   e.respondWith(
     fetch(e.request).then(r=>{
       const cp=r.clone();
